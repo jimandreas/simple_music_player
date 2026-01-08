@@ -3,14 +3,11 @@ package com.bammellab.musicplayer.ui.components
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -23,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bammellab.musicplayer.data.model.AudioFile
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.draw.clip
 
 @Composable
 fun NowPlayingView(
@@ -43,20 +41,13 @@ fun NowPlayingView(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Surface(
-                modifier = Modifier.size(120.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shape = MaterialTheme.shapes.medium
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Album,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
+            AlbumArtImage(
+                uri = currentTrack?.uri,
+                size = 120.dp,
+                fallbackIcon = Icons.Filled.Album,
+                showBackground = true,
+                modifier = Modifier.clip(MaterialTheme.shapes.medium)
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
