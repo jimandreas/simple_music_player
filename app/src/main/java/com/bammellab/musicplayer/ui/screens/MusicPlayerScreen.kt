@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.bammellab.musicplayer.ui.components.CastButton
 import com.bammellab.musicplayer.ui.components.FileListView
 import com.bammellab.musicplayer.ui.components.MusicLoadingIndicator
 import com.bammellab.musicplayer.ui.components.NowPlayingView
@@ -63,6 +64,7 @@ fun MusicPlayerScreen(
     val playbackState by viewModel.playbackState.collectAsStateWithLifecycle()
     val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
     val duration by viewModel.duration.collectAsStateWithLifecycle()
+    val castState by viewModel.castState.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     var showStorageDialog by remember { mutableStateOf(false) }
@@ -111,8 +113,22 @@ fun MusicPlayerScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Music Player") },
+                title = {
+                    Column {
+                        Text("Music Player")
+                        if (castState.isCasting) {
+                            Text(
+                                text = "Casting to ${castState.castDeviceName ?: "device"}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                },
                 actions = {
+                    // Cast button - shows when Cast devices are available
+                    CastButton(modifier = Modifier.size(48.dp))
+
                     IconButton(
                         onClick = onSelectFolder
                     ) {

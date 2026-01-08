@@ -8,9 +8,14 @@ import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.bammellab.musicplayer.cast.AudioStreamServer
+import com.bammellab.musicplayer.cast.CastRemotePlayer
+import com.bammellab.musicplayer.cast.CastSessionManager
+import com.bammellab.musicplayer.cast.CastUiState
 import com.bammellab.musicplayer.data.model.AudioFile
 import com.bammellab.musicplayer.player.AudioPlayerManager
 import com.bammellab.musicplayer.player.PlaybackState
+import com.bammellab.musicplayer.player.PlayerController
 import com.bammellab.musicplayer.player.ShuffleTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,29 +46,87 @@ data class MusicPlayerUiState(
 
 class MusicPlayerViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val audioPlayerManager = AudioPlayerManager(application)
+    // Local player
+    private val localPlayer = AudioPlayerManager(application)
+
+    // Cast components
+    val castSessionManager = CastSessionManager(application)
+    private val audioStreamServer = AudioStreamServer(application)
+    private val castPlayer = CastRemotePlayer(castSessionManager, audioStreamServer)
+
+    // Cast state for UI
+    val castState: StateFlow<CastUiState> = castSessionManager.castState
+
     private val shuffleTracker = ShuffleTracker(application)
     private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val _uiState = MutableStateFlow(MusicPlayerUiState())
     val uiState: StateFlow<MusicPlayerUiState> = _uiState.asStateFlow()
 
-    val playbackState: StateFlow<PlaybackState> = audioPlayerManager.playbackState
-    val currentPosition: StateFlow<Int> = audioPlayerManager.currentPosition
-    val duration: StateFlow<Int> = audioPlayerManager.duration
+    // Active player switches between local and cast
+    private val activePlayer: PlayerController
+        get() = if (castState.value.isCasting) castPlayer else localPlayer
+
+    // Playback state from active player
+    private val _playbackState = MutableStateFlow(PlaybackState.IDLE)
+    val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
+
+    private val _currentPosition = MutableStateFlow(0)
+    val currentPosition: StateFlow<Int> = _currentPosition.asStateFlow()
+
+    private val _duration = MutableStateFlow(0)
+    val duration: StateFlow<Int> = _duration.asStateFlow()
 
     private var positionUpdateJob: Job? = null
+    private var castStateObserverJob: Job? = null
 
     private val audioExtensions = setOf(
         "mp3", "wav", "ogg", "m4a", "aac", "flac", "wma", "opus"
     )
 
     init {
-        audioPlayerManager.setOnCompletionListener {
-            playNext()
-        }
+        // Set completion listeners for both players
+        localPlayer.setOnCompletionListener { playNext() }
+        castPlayer.setOnCompletionListener { playNext() }
+
+        // Observe cast state changes
+        startCastStateObserver()
+
         // Restore previously selected folder on startup
         restoreSavedFolder()
+    }
+
+    private fun startCastStateObserver() {
+        castStateObserverJob = viewModelScope.launch {
+            castState.collect { state ->
+                if (state.isCasting) {
+                    // Started casting - start HTTP server
+                    startStreamServer()
+                } else {
+                    // Stopped casting - stop HTTP server
+                    stopStreamServer()
+                }
+            }
+        }
+    }
+
+    private fun startStreamServer() {
+        try {
+            if (!audioStreamServer.isAlive) {
+                audioStreamServer.start()
+            }
+        } catch (e: Exception) {
+            // Server may already be running
+        }
+    }
+
+    private fun stopStreamServer() {
+        try {
+            audioStreamServer.stop()
+            audioStreamServer.clearRegisteredFiles()
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
 
     private fun restoreSavedFolder() {
@@ -206,8 +269,18 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         if (index !in files.indices) return
 
         _uiState.value = _uiState.value.copy(currentTrackIndex = index)
-        audioPlayerManager.play(files[index].uri)
-        audioPlayerManager.setVolume(_uiState.value.volume)
+
+        val audioFile = files[index]
+
+        if (castState.value.isCasting) {
+            // Play on Chromecast
+            castPlayer.playAudioFile(audioFile)
+        } else {
+            // Play locally
+            localPlayer.play(audioFile.uri)
+        }
+
+        activePlayer.setVolume(_uiState.value.volume)
         startPositionUpdates()
 
         // Save last played track for persistence
@@ -220,13 +293,13 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun togglePlayPause() {
-        when (playbackState.value) {
+        when (_playbackState.value) {
             PlaybackState.PLAYING -> {
-                audioPlayerManager.pause()
+                activePlayer.pause()
                 stopPositionUpdates()
             }
             PlaybackState.PAUSED -> {
-                audioPlayerManager.resume()
+                activePlayer.resume()
                 startPositionUpdates()
             }
             PlaybackState.STOPPED, PlaybackState.IDLE -> {
@@ -301,11 +374,11 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     private fun setVolume(volume: Float) {
         _uiState.value = _uiState.value.copy(volume = volume)
-        audioPlayerManager.setVolume(volume)
+        activePlayer.setVolume(volume)
     }
 
     fun seekTo(position: Int) {
-        audioPlayerManager.seekTo(position)
+        activePlayer.seekTo(position)
     }
 
     fun clearError() {
@@ -316,7 +389,11 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         stopPositionUpdates()
         positionUpdateJob = viewModelScope.launch {
             while (isActive) {
-                audioPlayerManager.updateCurrentPosition()
+                // Update from active player
+                activePlayer.updateCurrentPosition()
+                _playbackState.value = activePlayer.playbackState.value
+                _currentPosition.value = activePlayer.currentPosition.value
+                _duration.value = activePlayer.duration.value
                 delay(500)
             }
         }
@@ -330,7 +407,11 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     override fun onCleared() {
         super.onCleared()
         stopPositionUpdates()
-        audioPlayerManager.release()
+        castStateObserverJob?.cancel()
+        localPlayer.release()
+        castPlayer.release()
+        castSessionManager.release()
+        stopStreamServer()
     }
 
     companion object {
