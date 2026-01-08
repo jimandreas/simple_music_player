@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Music Player</string>
+    <string name="attribution_label">Music Playback Service</string>
 </resources>

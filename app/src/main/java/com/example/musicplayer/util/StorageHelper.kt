@@ -1,6 +1,7 @@
 package com.example.musicplayer.util
 
 import android.content.Context
+import android.os.Build
 import android.os.storage.StorageManager
 import android.os.storage.StorageVolume
 import android.provider.DocumentsContract
@@ -15,13 +16,22 @@ data class StorageOption(
 
 object StorageHelper {
 
+    private fun getAttributedContext(context: Context): Context {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.createAttributionContext("attributionTag")
+        } else {
+            context
+        }
+    }
+
     fun getStorageOptions(context: Context): List<StorageOption> {
-        val storageManager = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
+        val attributedContext = getAttributedContext(context)
+        val storageManager = attributedContext.getSystemService(Context.STORAGE_SERVICE) as StorageManager
         val volumes = storageManager.storageVolumes
 
         return volumes.filter { it.state == "mounted" }.map { volume ->
             StorageOption(
-                name = volume.getDescription(context) ?: if (volume.isPrimary) "Internal Storage" else "SD Card",
+                name = volume.getDescription(attributedContext) ?: if (volume.isPrimary) "Internal Storage" else "SD Card",
                 uuid = volume.uuid,
                 isPrimary = volume.isPrimary,
                 initialUri = buildInitialUri(volume)
