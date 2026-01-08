@@ -2,8 +2,6 @@
 
 A simple Android music player that plays audio files from a selected folder.
 
-![Screenshot](./docs/screenshots/screenshot.png )
-
 ## Features
 
 - Browse and select folders using Android's Storage Access Framework
@@ -18,10 +16,11 @@ A simple Android music player that plays audio files from a selected folder.
 ```bash
 ./gradlew assembleDebug
 ```
-
 ## Tech Stack
 
 - Kotlin
 - Jetpack Compose with Material 3
 - Android MediaPlayer API
 - ViewModel with StateFlow
+
+![Screenshot](./docs/screenshots/screenshot.png )
