@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.musicplayer.data.model.AudioFile
 import com.example.musicplayer.player.AudioPlayerManager
 import com.example.musicplayer.player.PlaybackState
+import com.example.musicplayer.player.ShuffleTracker
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +38,7 @@ data class MusicPlayerUiState(
 class MusicPlayerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val audioPlayerManager = AudioPlayerManager(application)
+    private val shuffleTracker = ShuffleTracker(application)
 
     private val _uiState = MutableStateFlow(MusicPlayerUiState())
     val uiState: StateFlow<MusicPlayerUiState> = _uiState.asStateFlow()
@@ -45,8 +47,6 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     val currentPosition: StateFlow<Int> = audioPlayerManager.currentPosition
     val duration: StateFlow<Int> = audioPlayerManager.duration
 
-    private var shuffledIndices: List<Int> = emptyList()
-    private var currentShufflePosition: Int = 0
     private var positionUpdateJob: Job? = null
 
     private val audioExtensions = setOf(
@@ -103,7 +103,8 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
                     isLoading = false
                 )
 
-                regenerateShuffleOrder()
+                // Initialize shuffle tracker for new folder
+                shuffleTracker.initialize(uri, files.size)
 
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -123,9 +124,9 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         audioPlayerManager.setVolume(_uiState.value.volume)
         startPositionUpdates()
 
+        // Mark track as played for shuffle tracking
         if (_uiState.value.shuffleEnabled) {
-            currentShufflePosition = shuffledIndices.indexOf(index)
-            if (currentShufflePosition == -1) currentShufflePosition = 0
+            shuffleTracker.markPlayed(index)
         }
     }
 
@@ -162,8 +163,12 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         if (files.isEmpty()) return
 
         val nextIndex = if (_uiState.value.shuffleEnabled) {
-            currentShufflePosition = (currentShufflePosition + 1) % shuffledIndices.size
-            shuffledIndices[currentShufflePosition]
+            // Check if all tracks have been played
+            if (shuffleTracker.isAllPlayed()) {
+                shuffleTracker.reset()
+            }
+            // Get next unplayed track
+            shuffleTracker.getNextUnplayedIndex() ?: 0
         } else {
             (_uiState.value.currentTrackIndex + 1) % files.size
         }
@@ -175,17 +180,9 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val files = _uiState.value.audioFiles
         if (files.isEmpty()) return
 
-        val prevIndex = if (_uiState.value.shuffleEnabled) {
-            currentShufflePosition = if (currentShufflePosition > 0) {
-                currentShufflePosition - 1
-            } else {
-                shuffledIndices.size - 1
-            }
-            shuffledIndices[currentShufflePosition]
-        } else {
-            val current = _uiState.value.currentTrackIndex
-            if (current > 0) current - 1 else files.size - 1
-        }
+        // Previous always goes sequentially (even in shuffle mode)
+        val current = _uiState.value.currentTrackIndex
+        val prevIndex = if (current > 0) current - 1 else files.size - 1
 
         playTrack(prevIndex)
     }
@@ -194,15 +191,10 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val newShuffleState = !_uiState.value.shuffleEnabled
         _uiState.value = _uiState.value.copy(shuffleEnabled = newShuffleState)
 
+        // Reset shuffle tracker when shuffle is turned on
         if (newShuffleState) {
-            regenerateShuffleOrder()
+            shuffleTracker.reset()
         }
-    }
-
-    private fun regenerateShuffleOrder() {
-        val files = _uiState.value.audioFiles
-        shuffledIndices = files.indices.shuffled()
-        currentShufflePosition = 0
     }
 
     fun volumeUp() {
