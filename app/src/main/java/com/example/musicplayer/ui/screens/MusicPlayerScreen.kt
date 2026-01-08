@@ -25,6 +25,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,10 +58,23 @@ fun MusicPlayerScreen(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val fileListState = rememberLazyListState()
+
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { message ->
             snackbarHostState.showSnackbar(message)
             viewModel.clearError()
+        }
+    }
+
+    LaunchedEffect(uiState.currentTrackIndex) {
+        if (uiState.currentTrackIndex >= 0) {
+            val viewportHeight = fileListState.layoutInfo.viewportEndOffset -
+                    fileListState.layoutInfo.viewportStartOffset
+            fileListState.animateScrollToItem(
+                index = uiState.currentTrackIndex,
+                scrollOffset = -viewportHeight / 2
+            )
         }
     }
 
@@ -147,7 +161,8 @@ fun MusicPlayerScreen(
                         onTrackSelected = { viewModel.playTrack(it) },
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxWidth()
+                            .fillMaxWidth(),
+                        listState = fileListState
                     )
 
                     HorizontalDivider()
