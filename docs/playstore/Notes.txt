@@ -1,0 +1,26 @@
+Created all promotional materials in docs/playstore/. Here's what's included:
+  ┌─────────────────────────────────┬──────────────────────────────────────────────────────────────────────────────┐
+  │              File               │                                   Purpose                                    │
+  ├─────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+  │ store_listing.md                │ App name, short description (80 chars), full description, category, keywords │
+  ├─────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+  │ privacy_policy.md               │ Privacy policy (required - host online before submission)                    │
+  ├─────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+  │ content_rating_questionnaire.md │ Pre-filled answers for content rating (expects "Everyone" rating)            │
+  ├─────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+  │ asset_specifications.md         │ Requirements for feature graphic, screenshots, icon with design tips         │
+  ├─────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+  │ release_notes.md                │ "What's New" text for v1.0.0                                                 │
+  ├─────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+  │ submission_checklist.md         │ Complete step-by-step checklist for successful submission                    │
+  └─────────────────────────────────┴──────────────────────────────────────────────────────────────────────────────┘
+  Before submitting, you'll need to:
+
+  1. Change the package name from com.example.musicplayer to your own unique identifier
+  2. Host the privacy policy at a public URL (GitHub Pages works well)
+  3. Create the feature graphic (1024x500) - see asset specs
+  4. Capture 2+ more screenshots showing different features
+  5. Fill in placeholder fields (email, website) in the documents
+  6. Generate a signed release build: ./gradlew bundleRelease
+
+  The submission checklist has everything you need to get accepted on the first try.
