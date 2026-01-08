@@ -1,4 +1,4 @@
-package com.example.musicplayer.ui.components
+package com.bammellab.musicplayer.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -25,7 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.musicplayer.data.model.AudioFile
+import com.bammellab.musicplayer.data.model.AudioFile
 
 @Composable
 fun FileListView(

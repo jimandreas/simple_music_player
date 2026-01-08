@@ -1,4 +1,4 @@
-package com.example.musicplayer.ui.screens
+package com.bammellab.musicplayer.ui.screens
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -46,12 +46,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.musicplayer.ui.components.FileListView
-import com.example.musicplayer.ui.components.NowPlayingView
-import com.example.musicplayer.ui.components.PlayerControls
-import com.example.musicplayer.util.StorageHelper
-import com.example.musicplayer.util.StorageOption
-import com.example.musicplayer.viewmodel.MusicPlayerViewModel
+import com.bammellab.musicplayer.ui.components.FileListView
+import com.bammellab.musicplayer.ui.components.NowPlayingView
+import com.bammellab.musicplayer.ui.components.PlayerControls
+import com.bammellab.musicplayer.util.StorageHelper
+import com.bammellab.musicplayer.util.StorageOption
+import com.bammellab.musicplayer.viewmodel.MusicPlayerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

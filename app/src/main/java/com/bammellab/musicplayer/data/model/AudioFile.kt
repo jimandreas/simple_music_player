@@ -1,4 +1,4 @@
-package com.example.musicplayer.data.model
+package com.bammellab.musicplayer.data.model
 
 import android.net.Uri
 

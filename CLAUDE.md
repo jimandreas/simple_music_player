@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew test
 
 # Run specific unit test class
-./gradlew testDebugUnitTest --tests "com.example.musicplayer.ExampleUnitTest"
+./gradlew testDebugUnitTest --tests "com.bammellab.musicplayer.ExampleUnitTest"
 
 # Run instrumented tests (requires connected device/emulator)
 ./gradlew connectedAndroidTest

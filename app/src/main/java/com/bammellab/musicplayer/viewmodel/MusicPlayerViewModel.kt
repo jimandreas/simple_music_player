@@ -1,4 +1,4 @@
-package com.example.musicplayer.viewmodel
+package com.bammellab.musicplayer.viewmodel
 
 import android.app.Application
 import android.content.Context
@@ -8,10 +8,10 @@ import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.musicplayer.data.model.AudioFile
-import com.example.musicplayer.player.AudioPlayerManager
-import com.example.musicplayer.player.PlaybackState
-import com.example.musicplayer.player.ShuffleTracker
+import com.bammellab.musicplayer.data.model.AudioFile
+import com.bammellab.musicplayer.player.AudioPlayerManager
+import com.bammellab.musicplayer.player.PlaybackState
+import com.bammellab.musicplayer.player.ShuffleTracker
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow

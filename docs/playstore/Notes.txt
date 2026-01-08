@@ -16,7 +16,7 @@ Created all promotional materials in docs/playstore/. Here's what's included:
   └─────────────────────────────────┴──────────────────────────────────────────────────────────────────────────────┘
   Before submitting, you'll need to:
 
-  1. Change the package name from com.example.musicplayer to your own unique identifier
+  1. Change the package name from com.bammellab.musicplayer to your own unique identifier
   2. Host the privacy policy at a public URL (GitHub Pages works well)
   3. Create the feature graphic (1024x500) - see asset specs
   4. Capture 2+ more screenshots showing different features

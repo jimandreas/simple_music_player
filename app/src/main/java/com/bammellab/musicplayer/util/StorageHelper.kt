@@ -1,4 +1,4 @@
-package com.example.musicplayer.util
+package com.bammellab.musicplayer.util
 
 import android.content.Context
 import android.os.Build

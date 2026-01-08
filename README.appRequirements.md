@@ -60,7 +60,7 @@ All core requirements have been implemented:
 
 ### Project Structure
 ```
-app/src/main/java/com/example/musicplayer/
+app/src/main/java/com/bammellab/musicplayer/
 ├── MainActivity.kt                    # Entry point
 ├── data/model/
 │   └── AudioFile.kt                   # Data model

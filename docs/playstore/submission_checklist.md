@@ -12,7 +12,7 @@ Complete this checklist before submitting your app to the Play Store.
 - [ ] Contact email verified
 
 ### App Configuration
-- [ ] Unique application ID: `com.example.musicplayer`
+- [ ] Unique application ID: `com.bammellab.musicplayer`
   - **Action Required:** Change to your own package name (e.g., `com.yourcompany.musicplayer`)
 - [ ] Version code set in `build.gradle`
 - [ ] Version name set (e.g., "1.0.0")
@@ -113,7 +113,7 @@ For this app, answer as follows:
 ## Before You Submit
 
 1. **Package Name Change Required**
-   - Current: `com.example.musicplayer`
+   - Current: `com.bammellab.musicplayer`
    - Change to your unique identifier (cannot be changed after publishing)
    - Update in `app/build.gradle`
 
@@ -150,7 +150,7 @@ For this app, answer as follows:
 3. **Privacy policy missing** - Must be accessible via URL
 4. **Broken links** - Verify all URLs work
 5. **Intellectual property** - Don't use copyrighted assets
-6. **Package name** - Must not use `com.example.*`
+6. **Package name** - Must not use `com.bammellab.*`
 
 ---
 

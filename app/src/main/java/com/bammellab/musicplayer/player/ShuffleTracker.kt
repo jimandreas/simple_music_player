@@ -1,4 +1,4 @@
-package com.example.musicplayer.player
+package com.bammellab.musicplayer.player
 
 import android.content.Context
 import android.content.SharedPreferences
