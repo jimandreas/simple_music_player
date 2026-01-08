@@ -11,6 +11,7 @@ import com.bammellab.musicplayer.ui.screens.MusicPlayerScreen
 import com.bammellab.musicplayer.ui.theme.MusicPlayerTheme
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

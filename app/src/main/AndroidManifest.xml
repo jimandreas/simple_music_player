@@ -13,6 +13,7 @@
     <attribution android:tag="attributionTag" android:label="@string/attribution_label" />
 
     <application
+        android:name=".MusicPlayerApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
