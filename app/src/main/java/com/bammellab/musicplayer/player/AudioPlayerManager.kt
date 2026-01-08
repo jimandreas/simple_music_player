@@ -16,26 +16,26 @@ enum class PlaybackState {
     ERROR
 }
 
-class AudioPlayerManager(private val context: Context) {
+class AudioPlayerManager(private val context: Context) : PlayerController {
 
     private var mediaPlayer: MediaPlayer? = null
 
     private val _playbackState = MutableStateFlow(PlaybackState.IDLE)
-    val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
+    override val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
     private val _currentPosition = MutableStateFlow(0)
-    val currentPosition: StateFlow<Int> = _currentPosition.asStateFlow()
+    override val currentPosition: StateFlow<Int> = _currentPosition.asStateFlow()
 
     private val _duration = MutableStateFlow(0)
-    val duration: StateFlow<Int> = _duration.asStateFlow()
+    override val duration: StateFlow<Int> = _duration.asStateFlow()
 
     private var onCompletionCallback: (() -> Unit)? = null
 
-    fun setOnCompletionListener(callback: () -> Unit) {
-        onCompletionCallback = callback
+    override fun setOnCompletionListener(listener: () -> Unit) {
+        onCompletionCallback = listener
     }
 
-    fun play(uri: Uri) {
+    override fun play(uri: Uri) {
         release()
 
         mediaPlayer = MediaPlayer().apply {
@@ -71,7 +71,7 @@ class AudioPlayerManager(private val context: Context) {
         }
     }
 
-    fun pause() {
+    override fun pause() {
         mediaPlayer?.let {
             if (it.isPlaying) {
                 it.pause()
@@ -80,7 +80,7 @@ class AudioPlayerManager(private val context: Context) {
         }
     }
 
-    fun resume() {
+    override fun resume() {
         mediaPlayer?.let {
             if (_playbackState.value == PlaybackState.PAUSED) {
                 it.start()
@@ -89,24 +89,24 @@ class AudioPlayerManager(private val context: Context) {
         }
     }
 
-    fun stop() {
+    override fun stop() {
         mediaPlayer?.let {
             it.stop()
             _playbackState.value = PlaybackState.STOPPED
         }
     }
 
-    fun setVolume(volume: Float) {
+    override fun setVolume(volume: Float) {
         val clampedVolume = volume.coerceIn(0f, 1f)
         mediaPlayer?.setVolume(clampedVolume, clampedVolume)
     }
 
-    fun seekTo(position: Int) {
+    override fun seekTo(position: Int) {
         mediaPlayer?.seekTo(position)
         _currentPosition.value = position
     }
 
-    fun updateCurrentPosition() {
+    override fun updateCurrentPosition() {
         mediaPlayer?.let {
             if (_playbackState.value == PlaybackState.PLAYING) {
                 _currentPosition.value = it.currentPosition
@@ -114,7 +114,7 @@ class AudioPlayerManager(private val context: Context) {
         }
     }
 
-    fun release() {
+    override fun release() {
         mediaPlayer?.release()
         mediaPlayer = null
         _playbackState.value = PlaybackState.IDLE
