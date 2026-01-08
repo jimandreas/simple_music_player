@@ -20,6 +20,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Run instrumented tests (requires connected device/emulator)
 ./gradlew connectedAndroidTest
 
+# Lint
+./gradlew lint
+
 # Clean and rebuild
 ./gradlew clean assembleDebug
 ```
