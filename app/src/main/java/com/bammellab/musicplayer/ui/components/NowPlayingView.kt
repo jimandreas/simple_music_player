@@ -61,29 +61,30 @@ fun NowPlayingView(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (currentTrack != null && duration > 0) {
-                Slider(
-                    value = currentPosition.toFloat(),
-                    onValueChange = { onSeek(it.toInt()) },
-                    valueRange = 0f..duration.toFloat(),
-                    modifier = Modifier.fillMaxWidth()
-                )
+            // Always show slider section to prevent layout shifts during track changes
+            val hasValidDuration = duration > 0
+            Slider(
+                value = if (hasValidDuration) currentPosition.toFloat() else 0f,
+                onValueChange = { if (hasValidDuration) onSeek(it.toInt()) },
+                valueRange = 0f..(if (hasValidDuration) duration.toFloat() else 1f),
+                enabled = hasValidDuration,
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = formatTime(currentPosition),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = formatTime(duration),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = formatTime(currentPosition),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = formatTime(duration),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

@@ -37,30 +37,34 @@ fun AlbumArtImage(
     fallbackIcon: ImageVector = Icons.Filled.MusicNote,
     showBackground: Boolean = true
 ) {
-    if (uri == null) {
-        FallbackIcon(
-            icon = fallbackIcon,
-            size = size,
-            showBackground = showBackground,
-            modifier = modifier
-        )
-        return
-    }
-
-    SubcomposeAsyncImage(
-        model = AlbumArtRequest(uri),
-        contentDescription = "Album art",
-        modifier = modifier
-            .size(size)
-            .clip(MaterialTheme.shapes.small),
-        contentScale = ContentScale.Crop,
-        loading = {
-            FallbackIcon(icon = fallbackIcon, size = size, showBackground = showBackground)
-        },
-        error = {
-            FallbackIcon(icon = fallbackIcon, size = size, showBackground = showBackground)
+    // Wrap in fixed-size Box to prevent layout shifts during loading/transitions
+    Box(
+        modifier = modifier.size(size),
+        contentAlignment = Alignment.Center
+    ) {
+        if (uri == null) {
+            FallbackIcon(
+                icon = fallbackIcon,
+                size = size,
+                showBackground = showBackground
+            )
+        } else {
+            SubcomposeAsyncImage(
+                model = AlbumArtRequest(uri),
+                contentDescription = "Album art",
+                modifier = Modifier
+                    .size(size)
+                    .clip(MaterialTheme.shapes.small),
+                contentScale = ContentScale.Crop,
+                loading = {
+                    FallbackIcon(icon = fallbackIcon, size = size, showBackground = showBackground)
+                },
+                error = {
+                    FallbackIcon(icon = fallbackIcon, size = size, showBackground = showBackground)
+                }
+            )
         }
-    )
+    }
 }
 
 @Composable
