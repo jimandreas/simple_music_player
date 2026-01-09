@@ -102,6 +102,9 @@ fun MusicPlayerScreen(
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // Use smallest width to detect tablets (minimum dimension regardless of orientation)
+    val smallestWidth = minOf(configuration.screenWidthDp, configuration.screenHeightDp)
+    val isTablet = smallestWidth >= 600
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { message ->
@@ -174,6 +177,7 @@ fun MusicPlayerScreen(
                     currentPosition = currentPosition,
                     duration = duration,
                     fileListState = fileListState,
+                    isTablet = isTablet,
                     onSelectFolder = onSelectFolder,
                     onTrackSelected = { viewModel.playTrack(it) },
                     onSeek = { viewModel.seekTo(it) },
@@ -371,6 +375,7 @@ private fun LandscapeLayout(
     currentPosition: Int,
     duration: Int,
     fileListState: LazyListState,
+    isTablet: Boolean,
     onSelectFolder: () -> Unit,
     onTrackSelected: (Int) -> Unit,
     onSeek: (Int) -> Unit,
@@ -448,7 +453,7 @@ private fun LandscapeLayout(
                     currentPosition = currentPosition,
                     duration = duration,
                     onSeek = onSeek,
-                    isCompact = true
+                    isCompact = !isTablet
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -463,7 +468,7 @@ private fun LandscapeLayout(
                     onShuffleToggle = onShuffleToggle,
                     onVolumeUp = onVolumeUp,
                     onVolumeDown = onVolumeDown,
-                    isCompact = true
+                    isCompact = !isTablet
                 )
             }
         }
