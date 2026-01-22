@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -76,7 +77,10 @@ fun NowPlayingView(
                         onValueChange = { if (hasValidDuration) onSeek(it.toInt()) },
                         valueRange = 0f..(if (hasValidDuration) duration.toFloat() else 1f),
                         enabled = hasValidDuration,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = SliderDefaults.colors(
+                            inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                        )
                     )
 
                     Row(
@@ -130,7 +134,10 @@ fun NowPlayingView(
                     onValueChange = { if (hasValidDuration) onSeek(it.toInt()) },
                     valueRange = 0f..(if (hasValidDuration) duration.toFloat() else 1f),
                     enabled = hasValidDuration,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = SliderDefaults.colors(
+                        inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                    )
                 )
 
                 Row(
