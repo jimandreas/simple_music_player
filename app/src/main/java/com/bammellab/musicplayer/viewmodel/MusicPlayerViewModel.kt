@@ -388,6 +388,8 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun seekTo(position: Int) {
         activePlayer.seekTo(position)
+        // Update UI immediately (important when paused, since position updates aren't running)
+        _currentPosition.value = position
     }
 
     fun clearError() {
