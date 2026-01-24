@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -25,12 +26,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.bammellab.musicplayer.data.model.MusicFolder
+import com.bammellab.musicplayer.data.model.FolderNode
 
 @Composable
 fun FolderListView(
-    folders: List<MusicFolder>,
-    onFolderSelected: (MusicFolder) -> Unit,
+    folders: List<FolderNode>,
+    onFolderSelected: (FolderNode) -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState()
 ) {
@@ -43,8 +44,8 @@ fun FolderListView(
             items = folders,
             key = { it.path }
         ) { folder ->
-            FolderItem(
-                folder = folder,
+            FolderNodeItem(
+                node = folder,
                 onClick = { onFolderSelected(folder) }
             )
         }
@@ -52,8 +53,8 @@ fun FolderListView(
 }
 
 @Composable
-private fun FolderItem(
-    folder: MusicFolder,
+private fun FolderNodeItem(
+    node: FolderNode,
     onClick: () -> Unit
 ) {
     Surface(
@@ -67,11 +68,14 @@ private fun FolderItem(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Use music note icon if folder has direct music, folder icon otherwise
+            val fallbackIcon = if (node.hasDirectMusic) Icons.Filled.MusicNote else Icons.Filled.Folder
+
             AlbumArtImage(
                 uri = null,
-                albumArtUri = folder.albumArtUri,
+                albumArtUri = node.albumArtUri,
                 size = 48.dp,
-                fallbackIcon = Icons.Filled.Folder,
+                fallbackIcon = fallbackIcon,
                 showBackground = true
             )
 
@@ -79,15 +83,28 @@ private fun FolderItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = folder.displayName,
+                    text = node.name,
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
+                // Show track count info based on folder type
+                val trackText = when {
+                    node.hasDirectMusic && node.hasChildren -> {
+                        "${node.directTrackCount} track${if (node.directTrackCount != 1) "s" else ""}, ${node.totalTrackCount - node.directTrackCount} in subfolders"
+                    }
+                    node.hasDirectMusic -> {
+                        "${node.directTrackCount} track${if (node.directTrackCount != 1) "s" else ""}"
+                    }
+                    else -> {
+                        "${node.totalTrackCount} track${if (node.totalTrackCount != 1) "s" else ""} in subfolders"
+                    }
+                }
+
                 Text(
-                    text = "${folder.trackCount} track${if (folder.trackCount != 1) "s" else ""}",
+                    text = trackText,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

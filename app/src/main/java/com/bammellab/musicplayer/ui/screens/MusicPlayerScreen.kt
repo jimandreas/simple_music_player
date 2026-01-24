@@ -41,7 +41,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.bammellab.musicplayer.data.model.MusicFolder
+import com.bammellab.musicplayer.data.model.FolderNode
 import com.bammellab.musicplayer.player.PlaybackState
 import com.bammellab.musicplayer.ui.components.CastButton
 import com.bammellab.musicplayer.ui.components.FileListView
@@ -117,12 +117,18 @@ fun MusicPlayerScreen(
                     }
                 },
                 navigationIcon = {
-                    // Show back button when viewing tracks (not in folder browser)
-                    if (hasPermission && !uiState.showFolderBrowser && uiState.hasFiles) {
-                        IconButton(onClick = { viewModel.showFolderBrowser() }) {
+                    // Show back button when:
+                    // 1. Viewing tracks (not in folder browser) - go back to folder browser
+                    // 2. In folder browser and can navigate up - go to parent folder
+                    val showBackButton = hasPermission && (
+                        (!uiState.showFolderBrowser && uiState.hasFiles) ||
+                        (uiState.showFolderBrowser && uiState.canNavigateUp)
+                    )
+                    if (showBackButton) {
+                        IconButton(onClick = { viewModel.handleBackNavigation() }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back to folders"
+                                contentDescription = "Back"
                             )
                         }
                     }
@@ -164,9 +170,12 @@ fun MusicPlayerScreen(
             // Show folder browser
             uiState.showFolderBrowser -> {
                 FolderBrowserContent(
-                    folders = uiState.allFolders,
+                    folders = uiState.currentFolderChildren,
+                    currentPath = uiState.currentBrowsePath,
+                    rootPath = uiState.folderTree?.path,
                     folderListState = folderListState,
-                    onFolderSelected = { viewModel.selectFolder(it) },
+                    onFolderSelected = { viewModel.navigateToFolder(it.path) },
+                    onPlayFolder = { viewModel.selectFolderForPlayback(it) },
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
@@ -257,9 +266,12 @@ private fun PermissionRequestContent(
 
 @Composable
 private fun FolderBrowserContent(
-    folders: List<MusicFolder>,
+    folders: List<FolderNode>,
+    currentPath: String?,
+    rootPath: String?,
     folderListState: LazyListState,
-    onFolderSelected: (MusicFolder) -> Unit,
+    onFolderSelected: (FolderNode) -> Unit,
+    onPlayFolder: (FolderNode) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -267,8 +279,17 @@ private fun FolderBrowserContent(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surfaceVariant
         ) {
+            // Show current folder name (relative to root)
+            val displayPath = when {
+                currentPath == null -> "Music"
+                currentPath == rootPath -> java.io.File(currentPath).name
+                rootPath != null && currentPath.startsWith(rootPath) -> {
+                    currentPath.removePrefix(rootPath).trimStart(java.io.File.separatorChar)
+                }
+                else -> java.io.File(currentPath).name
+            }
             Text(
-                text = "${folders.size} folder${if (folders.size != 1) "s" else ""} with music",
+                text = displayPath,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
@@ -299,7 +320,15 @@ private fun FolderBrowserContent(
         } else {
             FolderListView(
                 folders = folders,
-                onFolderSelected = onFolderSelected,
+                onFolderSelected = { node ->
+                    // If folder has only direct music (no children), play it directly
+                    // Otherwise, navigate into it
+                    if (node.hasDirectMusic && !node.hasChildren) {
+                        onPlayFolder(node)
+                    } else {
+                        onFolderSelected(node)
+                    }
+                },
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),

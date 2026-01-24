@@ -7,6 +7,7 @@ import com.bammellab.musicplayer.cast.CastRemotePlayer
 import com.bammellab.musicplayer.cast.CastSessionManager
 import com.bammellab.musicplayer.cast.CastUiState
 import com.bammellab.musicplayer.data.model.AudioFile
+import com.bammellab.musicplayer.data.model.FolderNode
 import com.bammellab.musicplayer.data.model.MusicFolder
 import com.bammellab.musicplayer.data.repository.MediaStoreRepository
 import com.bammellab.musicplayer.player.AudioPlayerManager
@@ -36,13 +37,20 @@ data class MusicPlayerUiState(
     val errorMessage: String? = null,
     val allFolders: List<MusicFolder> = emptyList(),
     val showFolderBrowser: Boolean = true,
-    val hasPermission: Boolean = false
+    val hasPermission: Boolean = false,
+    // Hierarchical folder navigation
+    val folderTree: FolderNode? = null,
+    val currentBrowsePath: String? = null,
+    val currentFolderChildren: List<FolderNode> = emptyList()
 ) {
     val currentTrack: AudioFile?
         get() = if (currentTrackIndex in audioFiles.indices) audioFiles[currentTrackIndex] else null
 
     val hasFiles: Boolean
         get() = audioFiles.isNotEmpty()
+
+    val canNavigateUp: Boolean
+        get() = currentBrowsePath != null && folderTree != null && currentBrowsePath != folderTree.path
 }
 
 class MusicPlayerViewModel(application: Application) : AndroidViewModel(application) {
@@ -149,14 +157,32 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 allFilesMap = result.allFiles
 
                 val savedFolderPath = getSavedFolderPath()
+                val savedBrowsePath = getSavedBrowsePath()
                 val savedShuffleState = getSavedShuffleState()
 
-                // Check if saved folder still exists
+                // Check if saved folder still exists (for playback)
                 val shouldRestoreFolder = savedFolderPath != null &&
                         result.folders.any { it.path == savedFolderPath }
 
+                // Initialize tree navigation at root or saved browse path
+                val folderTree = result.folderTree
+                val initialBrowsePath = when {
+                    savedBrowsePath != null && folderTree != null &&
+                            mediaStoreRepository.findNodeAtPath(folderTree, savedBrowsePath) != null -> savedBrowsePath
+                    folderTree != null -> folderTree.path
+                    else -> null
+                }
+                val initialChildren = if (folderTree != null && initialBrowsePath != null) {
+                    mediaStoreRepository.getChildrenAtPath(folderTree, initialBrowsePath)
+                } else {
+                    emptyList()
+                }
+
                 _uiState.value = _uiState.value.copy(
                     allFolders = result.folders,
+                    folderTree = folderTree,
+                    currentBrowsePath = initialBrowsePath,
+                    currentFolderChildren = initialChildren,
                     isLoading = false,
                     hasPermission = true,
                     showFolderBrowser = !shouldRestoreFolder,
@@ -228,6 +254,104 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         )
     }
 
+    /**
+     * Navigate into a subfolder in the tree.
+     */
+    fun navigateToFolder(path: String) {
+        val folderTree = _uiState.value.folderTree ?: return
+        val node = mediaStoreRepository.findNodeAtPath(folderTree, path) ?: return
+
+        // If the folder has direct music but no children, select it for playback
+        if (node.hasDirectMusic && !node.hasChildren) {
+            selectFolderForPlayback(node)
+            return
+        }
+
+        // Navigate into the folder
+        val children = mediaStoreRepository.getChildrenAtPath(folderTree, path)
+
+        _uiState.value = _uiState.value.copy(
+            currentBrowsePath = path,
+            currentFolderChildren = children
+        )
+
+        // Save browse path for persistence
+        saveBrowsePath(path)
+    }
+
+    /**
+     * Navigate up to the parent folder in the tree.
+     */
+    fun navigateUp() {
+        val currentPath = _uiState.value.currentBrowsePath ?: return
+        val folderTree = _uiState.value.folderTree ?: return
+
+        // If at root, can't go up
+        if (currentPath == folderTree.path) return
+
+        val parentPath = mediaStoreRepository.getParentPath(currentPath) ?: return
+
+        // Make sure parent is at or below the root
+        if (!parentPath.startsWith(folderTree.path)) return
+
+        val children = mediaStoreRepository.getChildrenAtPath(folderTree, parentPath)
+
+        _uiState.value = _uiState.value.copy(
+            currentBrowsePath = parentPath,
+            currentFolderChildren = children
+        )
+
+        // Save browse path for persistence
+        saveBrowsePath(parentPath)
+    }
+
+    /**
+     * Select a folder with direct tracks for playback.
+     */
+    fun selectFolderForPlayback(node: FolderNode) {
+        if (!node.hasDirectMusic) return
+
+        viewModelScope.launch {
+            // Stop current playback when changing folders
+            stopPositionUpdates()
+            activePlayer.stop()
+            _playbackState.value = PlaybackState.IDLE
+            _currentPosition.value = 0
+            _duration.value = 0
+
+            val files = mediaStoreRepository.getFilesForFolder(node.path, allFilesMap)
+
+            val trackIndex = if (files.isNotEmpty()) 0 else -1
+
+            _uiState.value = _uiState.value.copy(
+                audioFiles = files,
+                selectedFolderPath = node.path,
+                selectedFolderName = node.name,
+                currentTrackIndex = trackIndex,
+                showFolderBrowser = false
+            )
+
+            // Save selected folder
+            saveFolderPath(node.path)
+
+            // Initialize shuffle tracker for folder
+            shuffleTracker.initialize(null, files.size)
+        }
+    }
+
+    /**
+     * Handle back navigation - either go up in tree or go back to folder browser.
+     */
+    fun handleBackNavigation() {
+        if (!_uiState.value.showFolderBrowser) {
+            // Currently viewing tracks - go back to folder browser
+            showFolderBrowser()
+        } else if (_uiState.value.canNavigateUp) {
+            // In folder browser and can go up - navigate up
+            navigateUp()
+        }
+    }
+
     private fun saveFolderPath(path: String) {
         prefs.edit().putString(KEY_FOLDER_PATH, path).apply()
     }
@@ -241,6 +365,14 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             .remove(KEY_FOLDER_PATH)
             .remove(KEY_LAST_TRACK_INDEX)
             .apply()
+    }
+
+    private fun saveBrowsePath(path: String) {
+        prefs.edit().putString(KEY_BROWSE_PATH, path).apply()
+    }
+
+    private fun getSavedBrowsePath(): String? {
+        return prefs.getString(KEY_BROWSE_PATH, null)
     }
 
     private fun saveLastTrackIndex(index: Int) {
@@ -418,5 +550,6 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         private const val KEY_FOLDER_PATH = "selected_folder_path"
         private const val KEY_LAST_TRACK_INDEX = "last_track_index"
         private const val KEY_SHUFFLE_ENABLED = "shuffle_enabled"
+        private const val KEY_BROWSE_PATH = "browse_path"
     }
 }

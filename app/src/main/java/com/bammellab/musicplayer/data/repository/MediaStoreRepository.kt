@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import com.bammellab.musicplayer.data.model.AudioFile
+import com.bammellab.musicplayer.data.model.FolderNode
 import com.bammellab.musicplayer.data.model.MusicFolder
 import java.io.File
 
@@ -13,7 +14,8 @@ class MediaStoreRepository(private val context: Context) {
 
     data class MediaStoreResult(
         val folders: List<MusicFolder>,
-        val allFiles: Map<String, List<AudioFile>>
+        val allFiles: Map<String, List<AudioFile>>,
+        val folderTree: FolderNode?
     )
 
     fun queryAudioFiles(): MediaStoreResult {
@@ -113,10 +115,154 @@ class MediaStoreRepository(private val context: Context) {
             )
         }.sortedBy { it.displayName.lowercase() }
 
-        return MediaStoreResult(folders, filesMap)
+        // Build folder tree
+        val folderTree = buildFolderTree(filesMap)
+
+        return MediaStoreResult(folders, filesMap, folderTree)
     }
 
     fun getFilesForFolder(folderPath: String, allFiles: Map<String, List<AudioFile>>): List<AudioFile> {
         return allFiles[folderPath]?.sortedBy { it.displayName.lowercase() } ?: emptyList()
+    }
+
+    /**
+     * Build a hierarchical folder tree from flat folder paths.
+     * Finds the common root and creates intermediate nodes as needed.
+     */
+    private fun buildFolderTree(filesMap: Map<String, List<AudioFile>>): FolderNode? {
+        if (filesMap.isEmpty()) return null
+
+        val folderPaths = filesMap.keys.toList()
+
+        // Find common root path
+        val commonRoot = findCommonRoot(folderPaths)
+        if (commonRoot.isEmpty()) return null
+
+        // Build tree structure recursively
+        return buildNodeRecursive(commonRoot, filesMap)
+    }
+
+    /**
+     * Find the longest common prefix path among all folder paths.
+     */
+    private fun findCommonRoot(paths: List<String>): String {
+        if (paths.isEmpty()) return ""
+        if (paths.size == 1) {
+            // Single folder - use its parent as root
+            return File(paths.first()).parent ?: paths.first()
+        }
+
+        // Split paths into segments
+        val pathSegments = paths.map { it.split(File.separator) }
+        val minLength = pathSegments.minOf { it.size }
+
+        val commonSegments = mutableListOf<String>()
+        for (i in 0 until minLength) {
+            val segment = pathSegments[0][i]
+            if (pathSegments.all { it[i] == segment }) {
+                commonSegments.add(segment)
+            } else {
+                break
+            }
+        }
+
+        return commonSegments.joinToString(File.separator)
+    }
+
+    /**
+     * Recursively build a FolderNode for a given path.
+     */
+    private fun buildNodeRecursive(
+        path: String,
+        filesMap: Map<String, List<AudioFile>>
+    ): FolderNode {
+        val name = File(path).name.ifEmpty { path }
+        val directFiles = filesMap[path] ?: emptyList()
+        val directTrackCount = directFiles.size
+        val directAlbumArt = directFiles.firstNotNullOfOrNull { it.albumArtUri }
+
+        // Find immediate children folders
+        val childPaths = findImmediateChildren(path, filesMap.keys)
+        val children = childPaths
+            .map { buildNodeRecursive(it, filesMap) }
+            .sortedBy { it.name.lowercase() }
+
+        // Calculate total track count (direct + all descendants)
+        val totalTrackCount = directTrackCount + children.sumOf { it.totalTrackCount }
+
+        // Album art: use direct art if available, otherwise inherit from first child
+        val albumArtUri = directAlbumArt ?: children.firstNotNullOfOrNull { it.albumArtUri }
+
+        return FolderNode(
+            path = path,
+            name = name,
+            directTrackCount = directTrackCount,
+            totalTrackCount = totalTrackCount,
+            albumArtUri = albumArtUri,
+            children = children
+        )
+    }
+
+    /**
+     * Find immediate child folder paths for a given parent path.
+     * This includes both folders with direct music and intermediate folders.
+     */
+    private fun findImmediateChildren(parentPath: String, allFolderPaths: Set<String>): List<String> {
+        val immediateChildren = mutableSetOf<String>()
+        val parentNormalized = if (parentPath.endsWith(File.separator)) parentPath else parentPath + File.separator
+
+        for (folderPath in allFolderPaths) {
+            if (!folderPath.startsWith(parentNormalized)) continue
+            if (folderPath == parentPath) continue
+
+            // Get the relative path after the parent
+            val relativePath = folderPath.removePrefix(parentNormalized)
+            val segments = relativePath.split(File.separator)
+
+            if (segments.isNotEmpty()) {
+                // The immediate child is the first segment
+                val immediateChildPath = parentPath + File.separator + segments[0]
+                immediateChildren.add(immediateChildPath)
+            }
+        }
+
+        return immediateChildren.toList()
+    }
+
+    /**
+     * Get children of a folder at a specific path from the tree.
+     */
+    fun getChildrenAtPath(folderTree: FolderNode?, path: String): List<FolderNode> {
+        if (folderTree == null) return emptyList()
+
+        // If at the root
+        if (folderTree.path == path) {
+            return folderTree.children
+        }
+
+        // Search recursively
+        return findNodeAtPath(folderTree, path)?.children ?: emptyList()
+    }
+
+    /**
+     * Find a node at a specific path in the tree.
+     */
+    fun findNodeAtPath(root: FolderNode?, path: String): FolderNode? {
+        if (root == null) return null
+        if (root.path == path) return root
+
+        for (child in root.children) {
+            val found = findNodeAtPath(child, path)
+            if (found != null) return found
+        }
+
+        return null
+    }
+
+    /**
+     * Get the parent path of a given path.
+     */
+    fun getParentPath(path: String): String? {
+        return File(path).parent
     }
 }
