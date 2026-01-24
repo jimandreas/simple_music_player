@@ -171,8 +171,7 @@ fun MusicPlayerScreen(
             uiState.showFolderBrowser -> {
                 FolderBrowserContent(
                     folders = uiState.currentFolderChildren,
-                    currentPath = uiState.currentBrowsePath,
-                    rootPath = uiState.folderTree?.path,
+                    displayPath = uiState.currentBrowseDisplayPath,
                     folderListState = folderListState,
                     onFolderSelected = { viewModel.navigateToFolder(it.path) },
                     onPlayFolder = { viewModel.selectFolderForPlayback(it) },
@@ -267,8 +266,7 @@ private fun PermissionRequestContent(
 @Composable
 private fun FolderBrowserContent(
     folders: List<FolderNode>,
-    currentPath: String?,
-    rootPath: String?,
+    displayPath: String,
     folderListState: LazyListState,
     onFolderSelected: (FolderNode) -> Unit,
     onPlayFolder: (FolderNode) -> Unit,
@@ -279,15 +277,6 @@ private fun FolderBrowserContent(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surfaceVariant
         ) {
-            // Show current folder name (relative to root)
-            val displayPath = when {
-                currentPath == null -> "Music"
-                currentPath == rootPath -> java.io.File(currentPath).name
-                rootPath != null && currentPath.startsWith(rootPath) -> {
-                    currentPath.removePrefix(rootPath).trimStart(java.io.File.separatorChar)
-                }
-                else -> java.io.File(currentPath).name
-            }
             Text(
                 text = displayPath,
                 style = MaterialTheme.typography.bodyMedium,

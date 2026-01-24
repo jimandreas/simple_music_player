@@ -4,6 +4,8 @@ import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.os.Process
+import android.os.UserManager
 import android.provider.MediaStore
 import com.bammellab.musicplayer.data.model.AudioFile
 import com.bammellab.musicplayer.data.model.FolderNode
@@ -172,6 +174,8 @@ class MediaStoreRepository(private val context: Context) {
     /**
      * Convert storage folder names to human-friendly display names.
      * - "emulated" -> "Internal Storage"
+     * - "0" -> Primary user's name
+     * - "10", "11", etc. -> Secondary user's name
      * - "XXXX-XXXX" (SD card volume ID pattern) -> "SD Card"
      */
     private fun getHumanFriendlyName(path: String): String {
@@ -182,6 +186,12 @@ class MediaStoreRepository(private val context: Context) {
             return "Internal Storage"
         }
 
+        // Check for user ID folder (0 for primary, 10+ for secondary users)
+        val userId = rawName.toIntOrNull()
+        if (userId != null && (userId == 0 || userId >= 10)) {
+            return getUserDisplayName(userId)
+        }
+
         // Check for SD card pattern (4 hex digits, dash, 4 hex digits like "51ED-A7DC")
         val sdCardPattern = Regex("^[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$")
         if (sdCardPattern.matches(rawName)) {
@@ -189,6 +199,42 @@ class MediaStoreRepository(private val context: Context) {
         }
 
         return rawName
+    }
+
+    /**
+     * Get the display name for a user ID.
+     * Uses UserManager.userName on API 31+ for the current user,
+     * falls back to a default label otherwise.
+     */
+    private fun getUserDisplayName(userId: Int): String {
+        return try {
+            val userManager = context.getSystemService(Context.USER_SERVICE) as? UserManager
+            // getUserName() returns the current user's name (API 31+)
+            // We can only get the name for the current user without special permissions
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Get current user ID from the process UID (user ID is in the upper bits)
+                val currentUserId = Process.myUid() / 100000
+                if (userId == currentUserId) {
+                    userManager?.userName?.takeIf { it.isNotBlank() } ?: getDefaultUserLabel(userId)
+                } else {
+                    getDefaultUserLabel(userId)
+                }
+            } else {
+                getDefaultUserLabel(userId)
+            }
+        } catch (e: Exception) {
+            getDefaultUserLabel(userId)
+        }
+    }
+
+    /**
+     * Get a default label for a user ID when the actual name is not available.
+     */
+    private fun getDefaultUserLabel(userId: Int): String {
+        return when (userId) {
+            0 -> "Primary User"
+            else -> "User ${userId - 9}"  // User 10 → "User 1", User 11 → "User 2"
+        }
     }
 
     /**

@@ -51,6 +51,47 @@ data class MusicPlayerUiState(
 
     val canNavigateUp: Boolean
         get() = currentBrowsePath != null && folderTree != null && currentBrowsePath != folderTree.path
+
+    /**
+     * Human-friendly display path for the current browse location.
+     * Uses the friendly names from FolderNode (e.g., "Internal Storage > Jim > Music")
+     * instead of raw path segments (e.g., "emulated/0/Music").
+     */
+    val currentBrowseDisplayPath: String
+        get() {
+            if (currentBrowsePath == null) return "Music"
+            val tree = folderTree ?: return java.io.File(currentBrowsePath).name
+
+            // If at the root, just return its name
+            if (currentBrowsePath == tree.path) return tree.name
+
+            // Build display path by collecting friendly names from root to current
+            val rootPath = tree.path
+            if (!currentBrowsePath.startsWith(rootPath)) {
+                return java.io.File(currentBrowsePath).name
+            }
+
+            val relativePath = currentBrowsePath.removePrefix(rootPath).trimStart(java.io.File.separatorChar)
+            val segments = relativePath.split(java.io.File.separator)
+
+            // Traverse the tree to get friendly names for each segment
+            val friendlyNames = mutableListOf<String>()
+            var currentNode: FolderNode? = tree
+
+            for (segment in segments) {
+                val targetPath = (currentNode?.path ?: "") + java.io.File.separator + segment
+                val childNode = currentNode?.children?.find { it.path == targetPath }
+                if (childNode != null) {
+                    friendlyNames.add(childNode.name)
+                    currentNode = childNode
+                } else {
+                    // Node not found in tree, use raw segment name
+                    friendlyNames.add(segment)
+                }
+            }
+
+            return friendlyNames.joinToString(" > ")
+        }
 }
 
 class MusicPlayerViewModel(application: Application) : AndroidViewModel(application) {
