@@ -170,13 +170,35 @@ class MediaStoreRepository(private val context: Context) {
     }
 
     /**
+     * Convert storage folder names to human-friendly display names.
+     * - "emulated" -> "Internal Storage"
+     * - "XXXX-XXXX" (SD card volume ID pattern) -> "SD Card"
+     */
+    private fun getHumanFriendlyName(path: String): String {
+        val rawName = File(path).name.ifEmpty { path }
+
+        // Check for internal storage
+        if (rawName == "emulated") {
+            return "Internal Storage"
+        }
+
+        // Check for SD card pattern (4 hex digits, dash, 4 hex digits like "51ED-A7DC")
+        val sdCardPattern = Regex("^[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$")
+        if (sdCardPattern.matches(rawName)) {
+            return "SD Card"
+        }
+
+        return rawName
+    }
+
+    /**
      * Recursively build a FolderNode for a given path.
      */
     private fun buildNodeRecursive(
         path: String,
         filesMap: Map<String, List<AudioFile>>
     ): FolderNode {
-        val name = File(path).name.ifEmpty { path }
+        val name = getHumanFriendlyName(path)
         val directFiles = filesMap[path] ?: emptyList()
         val directTrackCount = directFiles.size
         val directAlbumArt = directFiles.firstNotNullOfOrNull { it.albumArtUri }
