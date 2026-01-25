@@ -1,10 +1,10 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.FileInputStream
 import java.util.Properties
 import kotlin.apply
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -23,17 +23,26 @@ android {
         applicationId = "com.bammellab.musicplayer"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
         create("release") {
-            storeFile = file("C:/a/j/bammellab/keystoresBammellab.jks")
-            storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD")
-            keyAlias = localProperties.getProperty("RELEASE_KEY_ALIAS")
-            keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD")
+            val props = Properties()
+            val propFile = file("../gradle/signing.properties")
+            if (propFile.canRead()) {
+                props.load(FileInputStream(propFile))
+                if (props.containsKey("STORE_FILE") && props.containsKey("STORE_PASSWORD") &&
+                    props.containsKey("KEY_ALIAS") && props.containsKey("KEY_PASSWORD")
+                ) {
+                    storeFile = file(props["STORE_FILE"] as String)
+                    storePassword = props["STORE_PASSWORD"] as String
+                    keyAlias = props["KEY_ALIAS"] as String
+                    keyPassword = props["KEY_PASSWORD"] as String
+                }
+            }
         }
     }
 
@@ -46,6 +55,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             isMinifyEnabled = false
@@ -62,6 +72,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

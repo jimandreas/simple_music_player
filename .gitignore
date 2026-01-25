@@ -48,8 +48,6 @@ gradle/signing.properties
 
 # claude
 .claude
-
-
-
+.claude/settings.local.json
 
 
