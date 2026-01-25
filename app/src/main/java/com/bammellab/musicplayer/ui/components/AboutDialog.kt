@@ -47,7 +47,8 @@ fun AboutDialog(
             Column(
                 modifier = Modifier
                     .padding(24.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(
