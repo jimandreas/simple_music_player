@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.FileInputStream
 import java.util.Properties
 import kotlin.apply
 
@@ -30,10 +31,19 @@ android {
     }
     signingConfigs {
         create("release") {
-            storeFile = file("C:/a/j/bammellab/keystoresBammellab.jks")
-            storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD")
-            keyAlias = localProperties.getProperty("RELEASE_KEY_ALIAS")
-            keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD")
+            val props = Properties()
+            val propFile = file("../gradle/signing.properties")
+            if (propFile.canRead()) {
+                props.load(FileInputStream(propFile))
+                if (props.containsKey("STORE_FILE") && props.containsKey("STORE_PASSWORD") &&
+                    props.containsKey("KEY_ALIAS") && props.containsKey("KEY_PASSWORD")
+                ) {
+                    storeFile = file(props["STORE_FILE"] as String)
+                    storePassword = props["STORE_PASSWORD"] as String
+                    keyAlias = props["KEY_ALIAS"] as String
+                    keyPassword = props["KEY_PASSWORD"] as String
+                }
+            }
         }
     }
 
@@ -46,6 +56,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             isMinifyEnabled = false
