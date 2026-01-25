@@ -5,8 +5,8 @@
     <!-- About Dialog -->
     <string name="about_this_app">このアプリについて…</string>
     <string name="about_this_app_subtitle">詳細はこちらをクリックしてください。</string>
-    <string name="play_store_title">Play Storeでこのアプリを見る…</string>
-    <string name="play_store_subtitle">Google Play Storeのページを見るにはこちらをクリックしてください。</string>
+    <string name="installation_title">インストール手順…</string>
+    <string name="installation_subtitle">このアプリのインストールと更新の手順はこちらをクリックしてください。</string>
     <string name="source_code_title">ソースコード</string>
     <string name="source_code_subtitle">このアプリのソースコードはGithubで公開されています。Githubに移動するにはこちらをクリックしてください。</string>
     <string name="version_label">バージョン</string>

@@ -5,8 +5,8 @@
     <!-- About Dialog -->
     <string name="about_this_app">Sobre este aplicativo…</string>
     <string name="about_this_app_subtitle">Clique aqui para mais informações.</string>
-    <string name="play_store_title">Este aplicativo na Play Store…</string>
-    <string name="play_store_subtitle">Clique aqui para ver a página da Google Play Store.</string>
+    <string name="installation_title">Instruções de instalação…</string>
+    <string name="installation_subtitle">Clique aqui para instruções sobre como instalar e atualizar este aplicativo.</string>
     <string name="source_code_title">Código fonte</string>
     <string name="source_code_subtitle">Este aplicativo tem código fonte disponível no Github. Clique aqui para ir ao Github.</string>
     <string name="version_label">Versão</string>
