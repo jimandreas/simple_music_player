@@ -28,3 +28,9 @@ Download the latest APK from the [Releases](../../releases) page and install it 
 - ViewModel with StateFlow
 
 <img src="docs/screenshots/screenshot.png" alt="screenshot" width = 270>
+
+## Album art credit
+
+see:
+
+https://en.wikipedia.org/wiki/Polygondwanaland
