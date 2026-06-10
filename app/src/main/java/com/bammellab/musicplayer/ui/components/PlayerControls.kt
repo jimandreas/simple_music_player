@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.bammellab.musicplayer.player.PlaybackState
 
@@ -85,11 +86,7 @@ fun PlayerControls(
                 Icon(
                     imageVector = Icons.Filled.Shuffle,
                     contentDescription = if (shuffleEnabled) "Disable shuffle" else "Enable shuffle",
-                    tint = if (shuffleEnabled) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                    tint = if (shuffleEnabled) Color(0xFFFFD600) else Color(0xFF616161),
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -160,11 +157,7 @@ fun PlayerControls(
                     Icon(
                         imageVector = Icons.Filled.Shuffle,
                         contentDescription = if (shuffleEnabled) "Disable shuffle" else "Enable shuffle",
-                        tint = if (shuffleEnabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        tint = if (shuffleEnabled) Color(0xFFFFD600) else Color(0xFF616161)
                     )
                 }
 

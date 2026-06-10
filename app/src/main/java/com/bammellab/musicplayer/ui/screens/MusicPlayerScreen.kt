@@ -1,6 +1,7 @@
 package com.bammellab.musicplayer.ui.screens
 
 import android.content.res.Configuration
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.VerticalDivider
@@ -42,9 +44,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bammellab.musicplayer.data.model.FolderNode
+import com.bammellab.musicplayer.data.model.SingleTrackItem
 import com.bammellab.musicplayer.player.PlaybackState
 import com.bammellab.musicplayer.ui.components.AboutDescriptionDialog
 import com.bammellab.musicplayer.ui.components.AboutDialog
@@ -54,6 +58,7 @@ import com.bammellab.musicplayer.ui.components.FolderListView
 import com.bammellab.musicplayer.ui.components.MusicLoadingIndicator
 import com.bammellab.musicplayer.ui.components.NowPlayingView
 import com.bammellab.musicplayer.ui.components.PlayerControls
+import com.bammellab.musicplayer.ui.components.SinglesListView
 import com.bammellab.musicplayer.viewmodel.MusicPlayerViewModel
 import com.bammellab.musicplayer.viewmodel.MusicPlayerUiState
 
@@ -70,6 +75,14 @@ fun MusicPlayerScreen(
     val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
     val duration by viewModel.duration.collectAsStateWithLifecycle()
     val castState by viewModel.castState.collectAsStateWithLifecycle()
+
+    val canGoBack = hasPermission && (
+        (!uiState.showFolderBrowser && uiState.hasFiles) ||
+        (uiState.showFolderBrowser && uiState.canNavigateUp)
+    )
+    BackHandler(enabled = canGoBack) {
+        viewModel.handleBackNavigation()
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val fileListState = rememberLazyListState()
@@ -97,13 +110,23 @@ fun MusicPlayerScreen(
     }
 
     LaunchedEffect(uiState.currentTrackIndex) {
-        if (uiState.currentTrackIndex >= 0) {
-            val viewportHeight = fileListState.layoutInfo.viewportEndOffset -
-                    fileListState.layoutInfo.viewportStartOffset
-            fileListState.animateScrollToItem(
-                index = uiState.currentTrackIndex,
-                scrollOffset = -viewportHeight / 2
-            )
+        val index = uiState.currentTrackIndex
+        if (index < 0) return@LaunchedEffect
+
+        val layoutInfo = fileListState.layoutInfo
+        val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+        val offset = if (viewportHeight > 0) -(viewportHeight / 2) else 0
+
+        // Animate only for small sequential hops (prev/next); jump instantly for shuffle
+        // or any other large distance to avoid the multi-pass layout jank.
+        val firstVisible = fileListState.firstVisibleItemIndex
+        val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: firstVisible
+        val isNearby = index in (firstVisible - 2)..(lastVisible + 2)
+
+        if (isNearby) {
+            fileListState.animateScrollToItem(index = index, scrollOffset = offset)
+        } else {
+            fileListState.scrollToItem(index = index, scrollOffset = offset)
         }
     }
 
@@ -185,9 +208,12 @@ fun MusicPlayerScreen(
                 FolderBrowserContent(
                     folders = uiState.currentFolderChildren,
                     displayPath = uiState.currentBrowseDisplayPath,
+                    singlesCollection = uiState.singlesCollection,
+                    currentPlayingUri = uiState.currentTrack?.uri,
                     folderListState = folderListState,
                     onFolderSelected = { viewModel.navigateToFolder(it.path) },
                     onPlayFolder = { viewModel.selectFolderForPlayback(it) },
+                    onPlaySingles = { singles, idx -> viewModel.playAllSinglesFrom(singles, idx) },
                     isRefreshing = uiState.isRefreshing,
                     onRefresh = { viewModel.refreshCurrentView() },
                     modifier = Modifier
@@ -307,12 +333,20 @@ private fun FolderBrowserContent(
     modifier: Modifier = Modifier,
     folders: List<FolderNode>,
     displayPath: String,
+    singlesCollection: List<SingleTrackItem> = emptyList(),
+    currentPlayingUri: Uri? = null,
     folderListState: LazyListState,
     onFolderSelected: (FolderNode) -> Unit,
     onPlayFolder: (FolderNode) -> Unit,
+    onPlaySingles: (List<SingleTrackItem>, Int) -> Unit = { _, _ -> },
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {}
 ) {
+    // Reset whenever the browse path changes; default to Folders view
+    var showSingles by remember(displayPath) {
+        mutableStateOf(false)
+    }
+
     Column(modifier = modifier) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -325,7 +359,39 @@ private fun FolderBrowserContent(
             )
         }
 
-        if (folders.isEmpty()) {
+        // View-mode toggle: shown when both singles and folder children exist
+        if (singlesCollection.isNotEmpty() && folders.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = showSingles,
+                    onClick = { showSingles = true },
+                    label = { Text("All Tracks (${singlesCollection.size})") }
+                )
+                FilterChip(
+                    selected = !showSingles,
+                    onClick = { showSingles = false },
+                    label = { Text("Folders") }
+                )
+            }
+        }
+
+        if (showSingles && singlesCollection.isNotEmpty()) {
+            SinglesListView(
+                singles = singlesCollection,
+                currentPlayingUri = currentPlayingUri,
+                onSingleSelected = { idx -> onPlaySingles(singlesCollection, idx) },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                isRefreshing = isRefreshing,
+                onRefresh = onRefresh
+            )
+        } else if (folders.isEmpty()) {
             androidx.compose.material3.pulltorefresh.PullToRefreshBox(
                 isRefreshing = isRefreshing,
                 onRefresh = onRefresh,

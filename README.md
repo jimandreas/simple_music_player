@@ -1,15 +1,18 @@
 # Music Player
 
-A simple Android music player that plays audio files from a selected folder.
+An Android music player with hierarchical folder browsing, Chromecast support, and smart flat-list views for large libraries.
 
 ## Features
 
-- Browse and select folders using Android's Storage Access Framework
+- Hierarchical folder browser — navigate your storage tree with human-friendly names (Internal Storage, SD Card, etc.)
 - Play MP3, WAV, OGG, FLAC, M4A, and other common audio formats
 - Playback controls: play/pause, previous/next track, volume up/down
-- Shuffle mode with auto-scroll to current track
+- Shuffle mode with visual indicator (bright yellow when active) and smart auto-scroll
+- **All Tracks flat view** — when a folder subtree contains many single-track directories (e.g. an iTunes library of singles), an "All Tracks" chip appears that collapses all leaf-folder tracks into one scrollable list showing artist and title
 - Seek bar for track position
-- Now Playing view with current track info
+- Now Playing view with album art, track info, and seek slider
+- Chromecast support — stream to any Cast device on the local network
+- System back button navigates up the folder tree (exits only when at the root)
 
 ## Installation
 

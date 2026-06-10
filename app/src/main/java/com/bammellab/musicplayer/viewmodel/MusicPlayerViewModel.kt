@@ -10,6 +10,7 @@ import com.bammellab.musicplayer.cast.CastUiState
 import com.bammellab.musicplayer.data.model.AudioFile
 import com.bammellab.musicplayer.data.model.FolderNode
 import com.bammellab.musicplayer.data.model.MusicFolder
+import com.bammellab.musicplayer.data.model.SingleTrackItem
 import com.bammellab.musicplayer.data.repository.MediaStoreRepository
 import com.bammellab.musicplayer.player.AudioPlayerManager
 import com.bammellab.musicplayer.player.PlaybackState
@@ -43,7 +44,9 @@ data class MusicPlayerUiState(
     // Hierarchical folder navigation
     val folderTree: FolderNode? = null,
     val currentBrowsePath: String? = null,
-    val currentFolderChildren: List<FolderNode> = emptyList()
+    val currentFolderChildren: List<FolderNode> = emptyList(),
+    // Singles collection: non-empty when current subtree has >= SINGLES_THRESHOLD single-track leaf folders
+    val singlesCollection: List<SingleTrackItem> = emptyList()
 ) {
     val currentTrack: AudioFile?
         get() = if (currentTrackIndex in audioFiles.indices) audioFiles[currentTrackIndex] else null
@@ -231,12 +234,14 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 } else {
                     emptyList()
                 }
+                val initialSingles = computeSingles(folderTree, initialBrowsePath)
 
                 _uiState.value = _uiState.value.copy(
                     allFolders = result.folders,
                     folderTree = folderTree,
                     currentBrowsePath = initialBrowsePath,
                     currentFolderChildren = initialChildren,
+                    singlesCollection = initialSingles,
                     isLoading = false,
                     hasPermission = true,
                     showFolderBrowser = !shouldRestoreFolder,
@@ -326,7 +331,8 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
         _uiState.value = _uiState.value.copy(
             currentBrowsePath = path,
-            currentFolderChildren = children
+            currentFolderChildren = children,
+            singlesCollection = computeSingles(folderTree, path)
         )
 
         // Save browse path for persistence
@@ -352,7 +358,8 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
         _uiState.value = _uiState.value.copy(
             currentBrowsePath = parentPath,
-            currentFolderChildren = children
+            currentFolderChildren = children,
+            singlesCollection = computeSingles(folderTree, parentPath)
         )
 
         // Save browse path for persistence
@@ -442,6 +449,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
                         folderTree = folderTree,
                         currentBrowsePath = validPath,
                         currentFolderChildren = children,
+                        singlesCollection = computeSingles(folderTree, validPath),
                         isRefreshing = false
                     )
 
@@ -498,6 +506,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
                             folderTree = folderTree,
                             currentBrowsePath = validPath,
                             currentFolderChildren = children,
+                            singlesCollection = computeSingles(folderTree, validPath),
                             showFolderBrowser = true,
                             audioFiles = emptyList(),
                             currentTrackIndex = -1,
@@ -519,6 +528,47 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
                     errorMessage = "Failed to refresh: ${e.message}"
                 )
             }
+        }
+    }
+
+    /**
+     * Compute the singles collection for the given browse path.
+     * Returns a non-empty list only when there are >= SINGLES_THRESHOLD single-track leaf folders.
+     */
+    private fun computeSingles(folderTree: FolderNode?, browsePath: String?): List<SingleTrackItem> {
+        if (folderTree == null || browsePath == null) return emptyList()
+        val node = mediaStoreRepository.findNodeAtPath(folderTree, browsePath) ?: return emptyList()
+        return mediaStoreRepository.collectLeafTracksIfSinglesThresholdMet(node, allFilesMap, SINGLES_THRESHOLD)
+    }
+
+    /**
+     * Load all singles as a playlist and start playing from startIndex.
+     */
+    fun playAllSinglesFrom(singles: List<SingleTrackItem>, startIndex: Int) {
+        if (startIndex !in singles.indices) return
+        viewModelScope.launch {
+            stopPositionUpdates()
+            activePlayer.stop()
+            _playbackState.value = PlaybackState.IDLE
+            _currentPosition.value = 0
+            _duration.value = 0
+
+            val files = singles.map { it.audioFile }
+            val currentState = _uiState.value
+
+            _uiState.value = currentState.copy(
+                audioFiles = files,
+                selectedFolderPath = currentState.currentBrowsePath,
+                selectedFolderName = currentState.currentBrowseDisplayPath,
+                currentTrackIndex = startIndex,
+                showFolderBrowser = false
+            )
+
+            if (currentState.currentBrowsePath != null) {
+                saveFolderPath(currentState.currentBrowsePath)
+            }
+            shuffleTracker.initialize(null, files.size)
+            playTrack(startIndex)
         }
     }
 
@@ -770,5 +820,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         private const val KEY_LAST_TRACK_INDEX = "last_track_index"
         private const val KEY_SHUFFLE_ENABLED = "shuffle_enabled"
         private const val KEY_BROWSE_PATH = "browse_path"
+        // Minimum number of single-track leaf folders needed to show the singles collection view
+        private const val SINGLES_THRESHOLD = 5
     }
 }

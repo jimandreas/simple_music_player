@@ -12,6 +12,7 @@ import androidx.annotation.RequiresPermission
 import com.bammellab.musicplayer.data.model.AudioFile
 import com.bammellab.musicplayer.data.model.FolderNode
 import com.bammellab.musicplayer.data.model.MusicFolder
+import com.bammellab.musicplayer.data.model.SingleTrackItem
 import java.io.File
 
 class MediaStoreRepository(private val context: Context) {
@@ -335,5 +336,45 @@ class MediaStoreRepository(private val context: Context) {
      */
     fun getParentPath(path: String): String? {
         return File(path).parent
+    }
+
+    /**
+     * Scans the subtree for leaf folders (no children).  If at least [minSingleLeafCount] of
+     * those leaves contain exactly one track, returns ALL tracks from ALL leaf folders sorted by
+     * artist then track name.  Otherwise returns empty, so the flat view is not shown.
+     *
+     * Detection is based on single-track leaves (the "iTunes singles" signal), but the returned
+     * list includes every track from every leaf — albums and singles alike — so the count matches
+     * the total shown in the folder browser.
+     */
+    fun collectLeafTracksIfSinglesThresholdMet(
+        node: FolderNode,
+        allFiles: Map<String, List<AudioFile>>,
+        minSingleLeafCount: Int
+    ): List<SingleTrackItem> {
+        val tracks = mutableListOf<SingleTrackItem>()
+        var singleLeafCount = 0
+
+        fun traverse(n: FolderNode) {
+            if (!n.hasChildren) {
+                val files = allFiles[n.path] ?: emptyList()
+                files.forEach { tracks.add(SingleTrackItem(it, n)) }
+                if (n.directTrackCount == 1) singleLeafCount++
+            } else {
+                n.children.forEach { traverse(it) }
+            }
+        }
+        node.children.forEach { traverse(it) }
+
+        return if (singleLeafCount >= minSingleLeafCount) {
+            tracks.sortedWith(
+                compareBy(
+                    { val a = it.audioFile.artist.trim(); if (a.isBlank() || a.startsWith("<")) "￿${it.folderNode.name.lowercase()}" else a.lowercase() },
+                    { it.audioFile.displayName.lowercase() }
+                )
+            )
+        } else {
+            emptyList()
+        }
     }
 }

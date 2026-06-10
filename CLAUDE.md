@@ -45,10 +45,11 @@ This is an Android music player app using Jetpack Compose and MVVM architecture 
 - **ViewModel** (`MusicPlayerViewModel`): Central business logic hub. Manages UI state via `MusicPlayerUiState` data class and `StateFlow`. Handles hierarchical folder browsing, track playback, shuffle logic, volume control, and player switching between local and cast playback.
 
 - **Data Layer** (`data/`):
-  - `MediaStoreRepository`: Queries MediaStore for all audio files, groups by folder path, and builds a `FolderNode` tree. Also provides `findNodeAtPath`, `getChildrenAtPath`, and `getParentPath` helpers for tree traversal.
+  - `MediaStoreRepository`: Queries MediaStore for all audio files, groups by folder path, and builds a `FolderNode` tree. Also provides `findNodeAtPath`, `getChildrenAtPath`, `getParentPath`, and `collectLeafTracksIfSinglesThresholdMet` helpers.
   - `AudioFile`: Data class with uri, displayName, mimeType, duration, albumId, albumArtUri, artist, album, folderPath. Has computed `isPlayable` (returns false for WMA, ASF, M4P) and `formattedDuration`.
   - `MusicFolder`: Flat folder model used alongside the tree for quick lookup.
   - `FolderNode`: Tree node for hierarchical browsing — has `path`, `name` (human-friendly), `directTrackCount`, `totalTrackCount`, `albumArtUri`, `children`. `hasDirectMusic` and `hasChildren` drive navigation decisions.
+  - `SingleTrackItem`: Pairs an `AudioFile` with its `FolderNode`; used for the All Tracks flat view.
   - `AlbumArtFetcher`: Custom Coil fetcher for album art (MediaStore URIs and embedded art).
 
 - **Player Abstraction** (`PlayerController` interface): Defines common playback operations (play, pause, resume, stop, seek, setVolume, updateCurrentPosition). Two implementations:
@@ -65,9 +66,11 @@ This is an Android music player app using Jetpack Compose and MVVM architecture 
 - **UI** (`ui/`): Jetpack Compose components that observe ViewModel state. `MusicPlayerScreen` is the main composable with four modes:
   - Permission request UI (first launch)
   - Loading indicator
-  - Folder browser (`FolderBrowserContent` / `FolderListView`) — tree-based navigation
+  - Folder browser (`FolderBrowserContent` / `FolderListView`) — tree-based navigation; shows "All Tracks" / "Folders" toggle chips when a singles-heavy subtree is detected
   - Track list with `NowPlayingView`, `PlayerControls`, and `CastButton`
   - Supports landscape layouts (`LandscapeLayout`) with side-by-side file list and player panel; tablet detection via smallest-width ≥ 600dp.
+  - `SinglesListView`: flat list composable showing artist + track name + duration for the All Tracks view.
+  - System back button is intercepted via `BackHandler` — navigates up the folder tree or back to the folder browser; exits the app only when at the tree root.
 
 ### Hierarchical Folder Navigation
 
@@ -76,9 +79,17 @@ The folder browser operates on a `FolderNode` tree rather than a flat list:
 - `currentBrowsePath`: the path currently being browsed.
 - `currentFolderChildren`: the children of the current node, shown in the list.
 - `currentBrowseDisplayPath`: computed human-friendly path string (e.g., "Internal Storage > Jim > Music") using friendly names from the tree.
-- Navigation: `navigateToFolder(path)` goes deeper; `navigateUp()` goes to parent; `handleBackNavigation()` either goes up in the tree or exits to folder browser from track list.
+- Navigation: `navigateToFolder(path)` goes deeper; `navigateUp()` goes to parent; `handleBackNavigation()` either goes up in the tree or exits to folder browser from track list. The Android system back button is wired to the same logic via `BackHandler`.
 - Folder names are humanized: `"emulated"` → `"Internal Storage"`, numeric user IDs → username via `UserManager` (API 31+) or `"Primary User"`, SD card volume IDs (hex-hex pattern) → `"SD Card"`.
 - If a `FolderNode` has direct music but no children, tapping it immediately starts playback. If it has children, it navigates into it.
+
+### All Tracks Flat View
+
+For libraries with many single-track leaf directories (e.g. iTunes singles collections):
+- On each navigation, `collectLeafTracksIfSinglesThresholdMet` scans the subtree. If ≥ `SINGLES_THRESHOLD` (5) leaf folders contain exactly one track, the method returns **all** tracks from **all** leaf folders (albums and singles alike), sorted by artist then title.
+- This list is stored in `singlesCollection` on `MusicPlayerUiState`.
+- When non-empty, `FolderBrowserContent` shows "All Tracks (N)" and "Folders" filter chips. Default is Folders; the user opts into All Tracks.
+- Tapping a track in the All Tracks view calls `playAllSinglesFrom()`, which loads the entire flat list as the active playlist and starts playback at the selected index. Normal shuffle/prev/next applies across the full list.
 
 ### Data Flow
 
@@ -98,11 +109,14 @@ The folder browser operates on a `FolderNode` tree rather than a flat list:
   - `showFolderBrowser`: folder browser vs track list
   - `hasPermission`, `isLoading`, `isRefreshing` (pull-to-refresh), `errorMessage`
   - `canNavigateUp`: true when not at tree root
+  - `singlesCollection`: non-empty `List<SingleTrackItem>` when the current subtree has ≥ 5 single-track leaf folders; populated on every navigation
 - `CastUiState`: casting status, device name, connection state.
 - `PlaybackState` enum: IDLE, PLAYING, PAUSED, STOPPED, ERROR.
 - `activePlayer` property dynamically returns local or cast player based on `castState.isCasting`.
 - Position updates run on a coroutine job every 500ms during playback.
 - Persistence via two SharedPreferences files: `music_player_prefs` (folder path, browse path, track index, shuffle state) and `shuffle_tracker` (played indices set).
+- Shuffle icon tint: `Color(0xFFFFD600)` (bright yellow) when enabled, `Color(0xFF616161)` (dark grey) when disabled.
+- Track list auto-scroll: uses `animateScrollToItem` only when the target is within 2 positions of the current viewport; uses instant `scrollToItem` for large jumps (shuffle) to avoid multi-pass layout jank.
 
 ### Album Art
 
