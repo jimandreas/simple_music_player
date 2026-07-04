@@ -45,7 +45,7 @@ This is an Android music player app using Jetpack Compose and MVVM architecture 
 - **ViewModel** (`MusicPlayerViewModel`): Central business logic hub. Manages UI state via `MusicPlayerUiState` data class and `StateFlow`. Handles hierarchical folder browsing, track playback, shuffle logic, volume control, and player switching between local and cast playback.
 
 - **Data Layer** (`data/`):
-  - `MediaStoreRepository`: Queries MediaStore for all audio files, groups by folder path, and builds a `FolderNode` tree. Also provides `findNodeAtPath`, `getChildrenAtPath`, `getParentPath`, and `collectLeafTracksIfSinglesThresholdMet` helpers.
+  - `MediaStoreRepository`: Queries MediaStore for all audio files, groups by folder path, and builds a `FolderNode` tree. Also provides `findNodeAtPath`, `getChildrenAtPath`, `getParentPath`, `collectLeafTracksIfSinglesThresholdMet`, and `searchTracks` helpers.
   - `AudioFile`: Data class with uri, displayName, mimeType, duration, albumId, albumArtUri, artist, album, folderPath. Has computed `isPlayable` (returns false for WMA, ASF, M4P) and `formattedDuration`.
   - `MusicFolder`: Flat folder model used alongside the tree for quick lookup.
   - `FolderNode`: Tree node for hierarchical browsing — has `path`, `name` (human-friendly), `directTrackCount`, `totalTrackCount`, `albumArtUri`, `children`. `hasDirectMusic` and `hasChildren` drive navigation decisions.
@@ -69,8 +69,8 @@ This is an Android music player app using Jetpack Compose and MVVM architecture 
   - Folder browser (`FolderBrowserContent` / `FolderListView`) — tree-based navigation; shows "All Tracks" / "Folders" toggle chips when a singles-heavy subtree is detected
   - Track list with `NowPlayingView`, `PlayerControls`, and `CastButton`
   - Supports landscape layouts (`LandscapeLayout`) with side-by-side file list and player panel; tablet detection via smallest-width ≥ 600dp.
-  - `SinglesListView`: flat list composable showing artist + track name + duration for the All Tracks view.
-  - System back button is intercepted via `BackHandler` — navigates up the folder tree or back to the folder browser; exits the app only when at the tree root.
+  - `SinglesListView`: flat list composable showing artist + track name + duration for the All Tracks view; also reused to render song search results.
+  - System back button is intercepted via `BackHandler` — navigates up the folder tree or back to the folder browser; exits the app only when at the tree root. A second `BackHandler` closes song search first when active.
 
 ### Hierarchical Folder Navigation
 
@@ -91,6 +91,14 @@ For libraries with many single-track leaf directories (e.g. iTunes singles colle
 - When non-empty, `FolderBrowserContent` shows "All Tracks (N)" and "Folders" filter chips. Default is Folders; the user opts into All Tracks.
 - Tapping a track in the All Tracks view calls `playAllSinglesFrom()`, which loads the entire flat list as the active playlist and starts playback at the selected index. Normal shuffle/prev/next applies across the full list.
 
+### Song Search
+
+Search is scoped to the folder subtree currently being browsed (`currentBrowsePath`), not the whole library:
+- A search icon in the `TopAppBar` (`MusicPlayerScreen`) swaps the title into a text field and opens the keyboard. A second `BackHandler`, registered after the folder-navigation one, closes search first on system back while it's active.
+- `MediaStoreRepository.searchTracks(node, allFiles, query)` walks every node in the given subtree (not just leaves, unlike `collectLeafTracksIfSinglesThresholdMet`) and matches each track's `displayName`, `artist`, and `album` case-insensitively via the pure `matchesSearchQuery` helper. Results are returned as `List<SingleTrackItem>` so they reuse `SinglesListView` for rendering and `playAllSinglesFrom` for playback.
+- `MusicPlayerViewModel.updateSearchQuery()` debounces input (~300ms) and resolves the scope node from `currentBrowsePath` — not `selectedFolderPath`. Because tapping into a leaf folder with direct music jumps straight to playback without updating `currentBrowsePath`, search from a leaf's track list still covers the parent subtree the user was browsing, not just that one leaf.
+- Search state (`isSearchActive`, `searchQuery`, `searchResults`) is ephemeral — not persisted to SharedPreferences — and playback already in progress continues uninterrupted while searching.
+
 ### Data Flow
 
 1. App requests `READ_MEDIA_AUDIO` (API 33+) or `READ_EXTERNAL_STORAGE` (older).
@@ -110,6 +118,7 @@ For libraries with many single-track leaf directories (e.g. iTunes singles colle
   - `hasPermission`, `isLoading`, `isRefreshing` (pull-to-refresh), `errorMessage`
   - `canNavigateUp`: true when not at tree root
   - `singlesCollection`: non-empty `List<SingleTrackItem>` when the current subtree has ≥ 5 single-track leaf folders; populated on every navigation
+  - `isSearchActive`, `searchQuery`, `searchResults`: ephemeral song-search state, scoped to the current browse subtree (see "Song Search" above); not persisted
 - `CastUiState`: casting status, device name, connection state.
 - `PlaybackState` enum: IDLE, PLAYING, PAUSED, STOPPED, ERROR.
 - `activePlayer` property dynamically returns local or cast player based on `castState.isCasting`.

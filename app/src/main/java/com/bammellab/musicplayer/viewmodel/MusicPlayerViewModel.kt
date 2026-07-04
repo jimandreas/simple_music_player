@@ -46,7 +46,11 @@ data class MusicPlayerUiState(
     val currentBrowsePath: String? = null,
     val currentFolderChildren: List<FolderNode> = emptyList(),
     // Singles collection: non-empty when current subtree has >= SINGLES_THRESHOLD single-track leaf folders
-    val singlesCollection: List<SingleTrackItem> = emptyList()
+    val singlesCollection: List<SingleTrackItem> = emptyList(),
+    // Search: scoped to the current browse subtree, ephemeral (not persisted)
+    val isSearchActive: Boolean = false,
+    val searchQuery: String = "",
+    val searchResults: List<SingleTrackItem> = emptyList()
 ) {
     val currentTrack: AudioFile?
         get() = if (currentTrackIndex in audioFiles.indices) audioFiles[currentTrackIndex] else null
@@ -140,6 +144,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     private var positionUpdateJob: Job? = null
     private var castStateObserverJob: Job? = null
+    private var searchJob: Job? = null
 
     init {
         // Set completion listeners for both players
@@ -570,6 +575,57 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             shuffleTracker.initialize(null, files.size)
             playTrack(startIndex)
         }
+    }
+
+    /**
+     * Activate search mode, scoped to the current browse subtree.
+     */
+    fun activateSearch() {
+        _uiState.value = _uiState.value.copy(isSearchActive = true, searchQuery = "", searchResults = emptyList())
+    }
+
+    /**
+     * Close search mode, cancelling any in-flight search and clearing its state.
+     */
+    fun deactivateSearch() {
+        searchJob?.cancel()
+        searchJob = null
+        _uiState.value = _uiState.value.copy(isSearchActive = false, searchQuery = "", searchResults = emptyList())
+    }
+
+    /**
+     * Debounced (~300ms) search over the folder subtree rooted at [MusicPlayerUiState.currentBrowsePath].
+     */
+    fun updateSearchQuery(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        searchJob?.cancel()
+
+        val state = _uiState.value
+        val scopeNode = state.currentBrowsePath
+            ?.let { mediaStoreRepository.findNodeAtPath(state.folderTree, it) }
+            ?: state.folderTree
+
+        searchJob = viewModelScope.launch {
+            delay(300)
+            val results = if (scopeNode != null) {
+                withContext(Dispatchers.Default) {
+                    mediaStoreRepository.searchTracks(scopeNode, allFilesMap, query)
+                }
+            } else {
+                emptyList()
+            }
+            _uiState.value = _uiState.value.copy(searchResults = results)
+        }
+    }
+
+    /**
+     * Play a search result by delegating to the existing singles-playback path, then close search.
+     */
+    fun playSearchResult(index: Int) {
+        val results = _uiState.value.searchResults
+        if (index !in results.indices) return
+        playAllSinglesFrom(results, index)
+        deactivateSearch()
     }
 
     /**

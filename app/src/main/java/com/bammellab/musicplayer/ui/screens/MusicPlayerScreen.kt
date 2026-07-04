@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -33,6 +36,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,7 +46,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.BackHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -83,12 +92,25 @@ fun MusicPlayerScreen(
     BackHandler(enabled = canGoBack) {
         viewModel.handleBackNavigation()
     }
+    // Registered after the handler above, so it takes priority while search is active.
+    BackHandler(enabled = uiState.isSearchActive) {
+        viewModel.deactivateSearch()
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val fileListState = rememberLazyListState()
     val folderListState = rememberLazyListState()
     var showAboutDialog by remember { mutableStateOf(false) }
     var showAboutDescriptionDialog by remember { mutableStateOf(false) }
+    val searchFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(uiState.isSearchActive) {
+        if (uiState.isSearchActive) {
+            searchFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -135,43 +157,82 @@ fun MusicPlayerScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("Music Player")
-                        if (castState.isCasting) {
-                            Text(
-                                text = "Casting to ${castState.castDeviceName ?: "device"}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                    if (uiState.isSearchActive) {
+                        TextField(
+                            value = uiState.searchQuery,
+                            onValueChange = { viewModel.updateSearchQuery(it) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(searchFocusRequester),
+                            placeholder = { Text("Search in ${uiState.currentBrowseDisplayPath}") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+                        )
+                    } else {
+                        Column {
+                            Text("Music Player")
+                            if (castState.isCasting) {
+                                Text(
+                                    text = "Casting to ${castState.castDeviceName ?: "device"}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 },
                 navigationIcon = {
-                    // Show back button when:
-                    // 1. Viewing tracks (not in folder browser) - go back to folder browser
-                    // 2. In folder browser and can navigate up - go to parent folder
-                    val showBackButton = hasPermission && (
-                        (!uiState.showFolderBrowser && uiState.hasFiles) ||
-                        (uiState.showFolderBrowser && uiState.canNavigateUp)
-                    )
-                    if (showBackButton) {
-                        IconButton(onClick = { viewModel.handleBackNavigation() }) {
+                    if (uiState.isSearchActive) {
+                        IconButton(onClick = { viewModel.deactivateSearch() }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back"
+                                contentDescription = "Close search"
                             )
+                        }
+                    } else {
+                        // Show back button when:
+                        // 1. Viewing tracks (not in folder browser) - go back to folder browser
+                        // 2. In folder browser and can navigate up - go to parent folder
+                        val showBackButton = hasPermission && (
+                            (!uiState.showFolderBrowser && uiState.hasFiles) ||
+                            (uiState.showFolderBrowser && uiState.canNavigateUp)
+                        )
+                        if (showBackButton) {
+                            IconButton(onClick = { viewModel.handleBackNavigation() }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
                         }
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showAboutDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Filled.Info,
-                            contentDescription = "About"
-                        )
+                    if (uiState.isSearchActive) {
+                        if (uiState.searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Close,
+                                    contentDescription = "Clear search"
+                                )
+                            }
+                        }
+                    } else {
+                        IconButton(onClick = { viewModel.activateSearch() }) {
+                            Icon(
+                                imageVector = Icons.Filled.Search,
+                                contentDescription = "Search"
+                            )
+                        }
+                        IconButton(onClick = { showAboutDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.Info,
+                                contentDescription = "About"
+                            )
+                        }
+                        // Cast button - shows when Cast devices are available
+                        CastButton(modifier = Modifier.size(48.dp))
                     }
-                    // Cast button - shows when Cast devices are available
-                    CastButton(modifier = Modifier.size(48.dp))
                 }
             )
         },
@@ -201,6 +262,21 @@ fun MusicPlayerScreen(
                         message = "Loading music files..."
                     )
                 }
+            }
+
+            // Search results take priority over both the folder browser and the track list,
+            // since neither is reachable while search is active (see the BackHandler comment above).
+            uiState.isSearchActive -> {
+                SearchResultsContent(
+                    query = uiState.searchQuery,
+                    scopeName = uiState.currentBrowseDisplayPath,
+                    results = uiState.searchResults,
+                    currentPlayingUri = uiState.currentTrack?.uri,
+                    onResultSelected = { viewModel.playSearchResult(it) },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                )
             }
 
             // Show folder browser
@@ -399,31 +475,12 @@ private fun FolderBrowserContent(
                     .weight(1f)
                     .fillMaxWidth()
             ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Filled.Folder,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "No music folders found",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Pull down to refresh",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                EmptyState(
+                    icon = Icons.Filled.Folder,
+                    message = "No music folders found",
+                    hint = "Pull down to refresh",
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         } else {
             FolderListView(
@@ -443,6 +500,77 @@ private fun FolderBrowserContent(
                 listState = folderListState,
                 isRefreshing = isRefreshing,
                 onRefresh = onRefresh
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyState(
+    icon: ImageVector,
+    message: String,
+    hint: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = hint,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchResultsContent(
+    modifier: Modifier = Modifier,
+    query: String,
+    scopeName: String,
+    results: List<SingleTrackItem>,
+    currentPlayingUri: Uri?,
+    onResultSelected: (Int) -> Unit
+) {
+    when {
+        query.isBlank() -> {
+            EmptyState(
+                icon = Icons.Filled.Search,
+                message = "Search in $scopeName",
+                hint = "Type a song, artist, or album name",
+                modifier = modifier
+            )
+        }
+        results.isEmpty() -> {
+            EmptyState(
+                icon = Icons.Filled.Search,
+                message = "No matches in $scopeName",
+                hint = "Try a different search term, or go back and browse into another folder",
+                modifier = modifier
+            )
+        }
+        else -> {
+            SinglesListView(
+                singles = results,
+                currentPlayingUri = currentPlayingUri,
+                onSingleSelected = onResultSelected,
+                modifier = modifier
             )
         }
     }

@@ -9,6 +9,7 @@ An Android music player with hierarchical folder browsing, Chromecast support, a
 - Playback controls: play/pause, previous/next track, volume up/down
 - Shuffle mode with visual indicator (bright yellow when active) and smart auto-scroll
 - **All Tracks flat view** — when a folder subtree contains many single-track directories (e.g. an iTunes library of singles), an "All Tracks" chip appears that collapses all leaf-folder tracks into one scrollable list showing artist and title
+- **Song search** — search icon in the top bar filters by title, artist, or album within the folder subtree you're currently browsing; tap a result to play it
 - Seek bar for track position
 - Now Playing view with album art, track info, and seek slider
 - Chromecast support — stream to any Cast device on the local network

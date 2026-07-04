@@ -377,4 +377,45 @@ class MediaStoreRepository(private val context: Context) {
             emptyList()
         }
     }
+
+    /**
+     * Search [node]'s subtree (the node itself plus all descendants) for tracks whose display
+     * name, artist, or album contains [query] (case-insensitive substring match). Unlike
+     * [collectLeafTracksIfSinglesThresholdMet], this visits every node in the subtree - not just
+     * leaves - so tracks placed directly in a folder that also has subfolders are still found.
+     * Returns emptyList() for a blank query.
+     */
+    fun searchTracks(
+        node: FolderNode,
+        allFiles: Map<String, List<AudioFile>>,
+        query: String
+    ): List<SingleTrackItem> {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank()) return emptyList()
+
+        val tracks = mutableListOf<SingleTrackItem>()
+
+        fun traverse(n: FolderNode) {
+            (allFiles[n.path] ?: emptyList())
+                .filter { matchesSearchQuery(it.displayName, it.artist, it.album, normalizedQuery) }
+                .forEach { tracks.add(SingleTrackItem(it, n)) }
+            n.children.forEach { traverse(it) }
+        }
+        traverse(node)
+
+        return tracks.sortedWith(
+            compareBy(
+                { val a = it.audioFile.artist.trim(); if (a.isBlank() || a.startsWith("<")) "￿${it.folderNode.name.lowercase()}" else a.lowercase() },
+                { it.audioFile.displayName.lowercase() }
+            )
+        )
+    }
+
+    companion object {
+        /** Pure string match used by [searchTracks] - kept Android-free so it's unit testable. */
+        internal fun matchesSearchQuery(displayName: String, artist: String, album: String, query: String): Boolean =
+            displayName.contains(query, ignoreCase = true) ||
+                artist.contains(query, ignoreCase = true) ||
+                album.contains(query, ignoreCase = true)
+    }
 }
