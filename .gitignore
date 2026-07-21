@@ -45,6 +45,7 @@ _sandbox
 
 # signing for release version
 gradle/signing.properties
+gradle/gradle-daemon-jvm.properties
 *.keystore
 *.jks
 
