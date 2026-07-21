@@ -72,13 +72,8 @@ private fun SingleTrackItemRow(
     isPlaying: Boolean,
     onClick: () -> Unit
 ) {
-    val artist = item.audioFile.artist.trim().let { a ->
-        if (a.isBlank() || a.startsWith("<")) item.folderNode.name else a
-    }
-    val trackName = item.audioFile.displayName.let { name ->
-        val dot = name.lastIndexOf('.')
-        if (dot > 0) name.substring(0, dot) else name
-    }
+    val artist = item.audioFile.displayArtist ?: item.folderNode.name
+    val trackName = item.audioFile.songTitle
 
     val containerColor = if (isPlaying) MaterialTheme.colorScheme.primaryContainer
                          else MaterialTheme.colorScheme.surface

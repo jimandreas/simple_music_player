@@ -14,6 +14,19 @@ data class AudioFile(
     val album: String = "",
     val folderPath: String = ""
 ) {
+    /** Display name without its file extension. */
+    val baseName: String
+        get() = stripExtension(displayName)
+
+    /** Song title parsed from an "artist - album - song" filename, or the whole base name. */
+    val songTitle: String by lazy { parseSongTitle(displayName) }
+
+    /** Artist from the filename convention, falling back to MediaStore metadata. */
+    val displayArtist: String? by lazy { parseArtist(displayName, artist) }
+
+    /** Album from the filename convention, falling back to MediaStore metadata. */
+    val displayAlbum: String? by lazy { parseAlbum(displayName, album) }
+
     val formattedDuration: String
         get() {
             if (duration <= 0) return "--:--"
@@ -46,4 +59,43 @@ data class AudioFile(
 
             return true
         }
+
+    // Parsing lives in pure companion functions (no Android deps) so it can be covered by
+    // plain JVM unit tests, which can't construct an AudioFile (android.net.Uri).
+    companion object {
+        fun stripExtension(name: String): String {
+            val dot = name.lastIndexOf('.')
+            return if (dot > 0) name.substring(0, dot) else name
+        }
+
+        // limit = 3 keeps any further " - " occurrences inside the song part
+        private fun nameParts(displayName: String): List<String> =
+            stripExtension(displayName).split(" - ", limit = 3)
+
+        fun parseSongTitle(displayName: String): String {
+            val parts = nameParts(displayName)
+            val song = when (parts.size) {
+                3 -> parts[2]
+                2 -> parts[1]
+                else -> ""
+            }.trim()
+            return song.ifEmpty { stripExtension(displayName) }
+        }
+
+        fun parseArtist(displayName: String, metadataArtist: String): String? {
+            val parts = nameParts(displayName)
+            val fromName = if (parts.size >= 2) parts[0].trim() else ""
+            return fromName.ifEmpty { null } ?: metadataOrNull(metadataArtist)
+        }
+
+        fun parseAlbum(displayName: String, metadataAlbum: String): String? {
+            val parts = nameParts(displayName)
+            val fromName = if (parts.size == 3) parts[1].trim() else ""
+            return fromName.ifEmpty { null } ?: metadataOrNull(metadataAlbum)
+        }
+
+        // MediaStore reports missing tags as "<unknown>"
+        private fun metadataOrNull(value: String): String? =
+            value.trim().takeIf { it.isNotBlank() && !it.startsWith("<") }
+    }
 }

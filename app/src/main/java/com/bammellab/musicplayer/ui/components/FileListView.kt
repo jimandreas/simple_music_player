@@ -118,7 +118,7 @@ private fun AudioFileItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = audioFile.displayName,
+                    text = audioFile.songTitle,
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

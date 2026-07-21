@@ -46,7 +46,7 @@ This is an Android music player app using Jetpack Compose and MVVM architecture 
 
 - **Data Layer** (`data/`):
   - `MediaStoreRepository`: Queries MediaStore for all audio files, groups by folder path, and builds a `FolderNode` tree. Also provides `findNodeAtPath`, `getChildrenAtPath`, `getParentPath`, `collectLeafTracksIfSinglesThresholdMet`, and `searchTracks` helpers.
-  - `AudioFile`: Data class with uri, displayName, mimeType, duration, albumId, albumArtUri, artist, album, folderPath. Has computed `isPlayable` (returns false for WMA, ASF, M4P) and `formattedDuration`.
+  - `AudioFile`: Data class with uri, displayName, mimeType, duration, albumId, albumArtUri, artist, album, folderPath. Has computed `isPlayable` (returns false for WMA, ASF, M4P) and `formattedDuration`. Also parses "artist - album - song" filenames via pure companion functions (`parseSongTitle`, `parseArtist`, `parseAlbum`, `stripExtension` — kept Android-free for JVM unit testing) exposed as cached instance properties `songTitle`, `displayArtist`, `displayAlbum`; parsing splits on `" - "` with limit 3 (extra " - " stays in the song title) and falls back to the extension-stripped name / MediaStore tags (`"<unknown>"` treated as absent).
   - `MusicFolder`: Flat folder model used alongside the tree for quick lookup.
   - `FolderNode`: Tree node for hierarchical browsing — has `path`, `name` (human-friendly), `directTrackCount`, `totalTrackCount`, `albumArtUri`, `children`. `hasDirectMusic` and `hasChildren` drive navigation decisions.
   - `SingleTrackItem`: Pairs an `AudioFile` with its `FolderNode`; used for the All Tracks flat view.
@@ -126,6 +126,13 @@ Search is scoped to the folder subtree currently being browsed (`currentBrowsePa
 - Persistence via two SharedPreferences files: `music_player_prefs` (folder path, browse path, track index, shuffle state) and `shuffle_tracker` (played indices set).
 - Shuffle icon tint: `Color(0xFFFFD600)` (bright yellow) when enabled, `Color(0xFF616161)` (dark grey) when disabled.
 - Track list auto-scroll: uses `animateScrollToItem` only when the target is within 2 positions of the current viewport; uses instant `scrollToItem` for large jumps (shuffle) to avoid multi-pass layout jank.
+
+### Track Titles and the Now Playing Details Dialog
+
+Track titles shown in the UI use `AudioFile.songTitle` (song part parsed from "artist - album - song" filenames) rather than the raw filename:
+- `NowPlayingView` (both portrait and compact layouts), `FileListView` rows, and `SinglesListView` rows all show `songTitle`; `SinglesListView` shows `displayArtist` (folder name fallback) on its artist line.
+- Tapping the Now Playing title opens `TrackDetailsDialog` (private to `NowPlayingView.kt`): album art + song/artist/album lines, dismissed by tapping anywhere or automatically after 10s. Dialog state is keyed on the track URI so it closes when the track changes. Artist/album lines are omitted when unknown.
+- Chromecast metadata (`CastRemotePlayer`) intentionally still sends the full `displayName` as the title.
 
 ### Album Art
 
