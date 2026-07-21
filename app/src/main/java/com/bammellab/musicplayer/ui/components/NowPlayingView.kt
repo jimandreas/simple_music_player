@@ -1,5 +1,7 @@
 package com.bammellab.musicplayer.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +27,7 @@ import com.bammellab.musicplayer.data.model.AudioFile
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.draw.clip
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NowPlayingView(
     currentTrack: AudioFile?,
@@ -67,7 +70,11 @@ fun NowPlayingView(
                         text = currentTrack?.displayName ?: "No track selected",
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        softWrap = false,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .basicMarquee()
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -124,8 +131,12 @@ fun NowPlayingView(
                     text = currentTrack?.displayName ?: "No track selected",
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    softWrap = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .basicMarquee()
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
